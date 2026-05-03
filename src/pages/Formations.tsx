@@ -147,19 +147,27 @@ export default function Formations() {
     if (error) toast.error(error.message); else { toast.success("Statut mis à jour"); load(); }
   };
 
-  const StagiairesPicker = ({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void }) => (
-    <ScrollArea className="h-48 rounded-md border border-border/60 bg-background/40 p-2">
-      {stagiaires.length === 0 ? (
-        <p className="text-xs text-muted-foreground p-2">Aucun stagiaire. Créez-en d'abord dans l'onglet Stagiaires.</p>
-      ) : stagiaires.map((s) => (
-        <label key={s.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/40 cursor-pointer">
-          <Checkbox checked={selected.includes(s.id)} onCheckedChange={() => onToggle(s.id)} />
-          <span className="text-sm">{s.last_name.toUpperCase()} {s.first_name}</span>
-          {s.email && <span className="text-xs text-muted-foreground ml-auto">{s.email}</span>}
-        </label>
-      ))}
-    </ScrollArea>
-  );
+  const StagiairesPicker = ({ selected, onToggle, busy }: { selected: string[]; onToggle: (id: string) => void; busy: Set<string> }) => {
+    const available = stagiaires.filter((s) => !busy.has(s.id));
+    return (
+      <ScrollArea className="h-48 rounded-md border border-border/60 bg-background/40 p-2">
+        {stagiaires.length === 0 ? (
+          <p className="text-xs text-muted-foreground p-2">Aucun stagiaire. Créez-en d'abord dans l'onglet Stagiaires.</p>
+        ) : available.length === 0 ? (
+          <p className="text-xs text-muted-foreground p-2">Aucun stagiaire disponible sur ces dates (tous déjà inscrits sur une autre session).</p>
+        ) : available.map((s) => (
+          <label key={s.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/40 cursor-pointer">
+            <Checkbox checked={selected.includes(s.id)} onCheckedChange={() => onToggle(s.id)} />
+            <span className="text-sm">{s.last_name.toUpperCase()} {s.first_name}</span>
+            {s.email && <span className="text-xs text-muted-foreground ml-auto">{s.email}</span>}
+          </label>
+        ))}
+        {busy.size > 0 && available.length > 0 && (
+          <p className="text-[10px] text-muted-foreground/70 mt-2 px-1">{busy.size} stagiaire(s) masqué(s) car déjà inscrit(s) sur ces dates.</p>
+        )}
+      </ScrollArea>
+    );
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
