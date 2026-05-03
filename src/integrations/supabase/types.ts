@@ -14,16 +14,231 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      formations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          end_date: string
+          formateur_id: string | null
+          id: string
+          location: string | null
+          max_participants: number | null
+          start_date: string
+          status: string
+          title: string
+          type: Database["public"]["Enums"]["formation_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_date: string
+          formateur_id?: string | null
+          id?: string
+          location?: string | null
+          max_participants?: number | null
+          start_date: string
+          status?: string
+          title: string
+          type?: Database["public"]["Enums"]["formation_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_date?: string
+          formateur_id?: string | null
+          id?: string
+          location?: string | null
+          max_participants?: number | null
+          start_date?: string
+          status?: string
+          title?: string
+          type?: Database["public"]["Enums"]["formation_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      incidents: {
+        Row: {
+          author_id: string
+          created_at: string
+          description: string | null
+          id: string
+          location: string | null
+          occurred_at: string
+          severity: Database["public"]["Enums"]["incident_severity"]
+          status: Database["public"]["Enums"]["incident_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          occurred_at?: string
+          severity?: Database["public"]["Enums"]["incident_severity"]
+          status?: Database["public"]["Enums"]["incident_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          occurred_at?: string
+          severity?: Database["public"]["Enums"]["incident_severity"]
+          status?: Database["public"]["Enums"]["incident_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stagiaires: {
+        Row: {
+          address: string | null
+          birth_date: string | null
+          carte_pro_expiry: string | null
+          carte_pro_number: string | null
+          city: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          notes: string | null
+          phone: string | null
+          photo_url: string | null
+          postal_code: string | null
+          status: Database["public"]["Enums"]["stagiaire_status"]
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          birth_date?: string | null
+          carte_pro_expiry?: string | null
+          carte_pro_number?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          notes?: string | null
+          phone?: string | null
+          photo_url?: string | null
+          postal_code?: string | null
+          status?: Database["public"]["Enums"]["stagiaire_status"]
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          birth_date?: string | null
+          carte_pro_expiry?: string | null
+          carte_pro_number?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          notes?: string | null
+          phone?: string | null
+          photo_url?: string | null
+          postal_code?: string | null
+          status?: Database["public"]["Enums"]["stagiaire_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "administrateur" | "formateur" | "agent" | "secretaire"
+      formation_type:
+        | "APS"
+        | "SST"
+        | "SSIAP1"
+        | "SSIAP2"
+        | "SSIAP3"
+        | "MAC_APS"
+        | "H0B0"
+        | "AUTRE"
+      incident_severity: "faible" | "moyen" | "eleve" | "critique"
+      incident_status: "ouvert" | "en_cours" | "resolu"
+      stagiaire_status: "en_attente" | "valide" | "rejete" | "archive"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +365,21 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["administrateur", "formateur", "agent", "secretaire"],
+      formation_type: [
+        "APS",
+        "SST",
+        "SSIAP1",
+        "SSIAP2",
+        "SSIAP3",
+        "MAC_APS",
+        "H0B0",
+        "AUTRE",
+      ],
+      incident_severity: ["faible", "moyen", "eleve", "critique"],
+      incident_status: ["ouvert", "en_cours", "resolu"],
+      stagiaire_status: ["en_attente", "valide", "rejete", "archive"],
+    },
   },
 } as const
