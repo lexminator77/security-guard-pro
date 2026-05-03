@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      formation_participants: {
+        Row: {
+          created_at: string
+          formation_id: string
+          id: string
+          notes: string | null
+          stagiaire_id: string
+          status: Database["public"]["Enums"]["participant_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          formation_id: string
+          id?: string
+          notes?: string | null
+          stagiaire_id: string
+          status?: Database["public"]["Enums"]["participant_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          formation_id?: string
+          id?: string
+          notes?: string | null
+          stagiaire_id?: string
+          status?: Database["public"]["Enums"]["participant_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formation_participants_formation_id_fkey"
+            columns: ["formation_id"]
+            isOneToOne: false
+            referencedRelation: "formations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formation_participants_stagiaire_id_fkey"
+            columns: ["stagiaire_id"]
+            isOneToOne: false
+            referencedRelation: "stagiaires"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formations: {
         Row: {
           created_at: string
@@ -238,6 +283,7 @@ export type Database = {
         | "AUTRE"
       incident_severity: "faible" | "moyen" | "eleve" | "critique"
       incident_status: "ouvert" | "en_cours" | "resolu"
+      participant_status: "inscrit" | "present" | "absent" | "valide" | "echec"
       stagiaire_status: "en_attente" | "valide" | "rejete" | "archive"
     }
     CompositeTypes: {
@@ -379,6 +425,7 @@ export const Constants = {
       ],
       incident_severity: ["faible", "moyen", "eleve", "critique"],
       incident_status: ["ouvert", "en_cours", "resolu"],
+      participant_status: ["inscrit", "present", "absent", "valide", "echec"],
       stagiaire_status: ["en_attente", "valide", "rejete", "archive"],
     },
   },
