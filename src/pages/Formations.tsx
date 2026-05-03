@@ -19,6 +19,29 @@ const PARTICIPANT_STATUSES = ["inscrit", "present", "absent", "valide", "echec"]
 type Stagiaire = { id: string; first_name: string; last_name: string; email: string | null };
 type Participant = { id: string; stagiaire_id: string; status: string; stagiaire?: Stagiaire };
 
+// Returns set of stagiaire IDs already booked on a session overlapping [start,end], excluding `excludeFormationId`.
+const getBusyStagiaireIds = (
+  formations: any[],
+  participantsByFormation: Record<string, Participant[]>,
+  start: string,
+  end: string,
+  excludeFormationId?: string,
+): Set<string> => {
+  const busy = new Set<string>();
+  if (!start || !end) return busy;
+  const s = new Date(start).getTime();
+  const e = new Date(end).getTime();
+  for (const f of formations) {
+    if (excludeFormationId && f.id === excludeFormationId) continue;
+    const fs = new Date(f.start_date).getTime();
+    const fe = new Date(f.end_date).getTime();
+    if (fs <= e && fe >= s) {
+      (participantsByFormation[f.id] ?? []).forEach((p) => busy.add(p.stagiaire_id));
+    }
+  }
+  return busy;
+};
+
 export default function Formations() {
   const [list, setList] = useState<any[]>([]);
   const [stagiaires, setStagiaires] = useState<Stagiaire[]>([]);
