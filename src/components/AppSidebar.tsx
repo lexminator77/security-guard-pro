@@ -13,11 +13,11 @@ const mainItems = [
   { title: "Tableau de bord", url: "/", icon: LayoutDashboard },
   { title: "Stagiaires", url: "/stagiaires", icon: Users },
   { title: "Formations", url: "/formations", icon: GraduationCap },
+  { title: "Planning", url: "/planning", icon: Calendar },
   { title: "Incidents", url: "/incidents", icon: AlertTriangle },
 ];
 
 const soonItems = [
-  { title: "Planning", url: "/planning", icon: Calendar },
   { title: "Documents", url: "/documents", icon: FileText },
   { title: "Entreprises", url: "/entreprises", icon: Building2 },
   { title: "Rappels", url: "/rappels", icon: Bell },
