@@ -45,8 +45,8 @@ export default function Auth() {
           },
         });
         if (error) throw error;
-        toast.success("Compte créé. Vous êtes connecté.");
-        nav("/");
+        toast.success("Compte créé ! Vérifiez votre boîte mail pour confirmer votre adresse avant de vous connecter.");
+        setMode("login");
       } else {
         const parsed = loginSchema.parse(form);
         const { error } = await supabase.auth.signInWithPassword({
