@@ -262,7 +262,7 @@ export default function Formations() {
           <DialogHeader><DialogTitle>Stagiaires — {manageFormation?.title}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">{manageSelected.length} sélectionné(s)</p>
-            <StagiairesPicker selected={manageSelected} onToggle={(id) => toggleStagiaire(id, manageSelected, setManageSelected)} />
+            <StagiairesPicker selected={manageSelected} onToggle={(id) => toggleStagiaire(id, manageSelected, setManageSelected)} busy={manageFormation ? getBusyStagiaireIds(list, participantsByFormation, manageFormation.start_date, manageFormation.end_date, manageFormation.id) : new Set()} />
             <Button className="w-full gradient-primary text-primary-foreground" onClick={saveManage}>Enregistrer</Button>
           </div>
         </DialogContent>
