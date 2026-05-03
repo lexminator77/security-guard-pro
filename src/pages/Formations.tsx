@@ -19,6 +19,29 @@ const PARTICIPANT_STATUSES = ["inscrit", "present", "absent", "valide", "echec"]
 type Stagiaire = { id: string; first_name: string; last_name: string; email: string | null };
 type Participant = { id: string; stagiaire_id: string; status: string; stagiaire?: Stagiaire };
 
+// Returns set of stagiaire IDs already booked on a session overlapping [start,end], excluding `excludeFormationId`.
+const getBusyStagiaireIds = (
+  formations: any[],
+  participantsByFormation: Record<string, Participant[]>,
+  start: string,
+  end: string,
+  excludeFormationId?: string,
+): Set<string> => {
+  const busy = new Set<string>();
+  if (!start || !end) return busy;
+  const s = new Date(start).getTime();
+  const e = new Date(end).getTime();
+  for (const f of formations) {
+    if (excludeFormationId && f.id === excludeFormationId) continue;
+    const fs = new Date(f.start_date).getTime();
+    const fe = new Date(f.end_date).getTime();
+    if (fs <= e && fe >= s) {
+      (participantsByFormation[f.id] ?? []).forEach((p) => busy.add(p.stagiaire_id));
+    }
+  }
+  return busy;
+};
+
 export default function Formations() {
   const [list, setList] = useState<any[]>([]);
   const [stagiaires, setStagiaires] = useState<Stagiaire[]>([]);
@@ -124,19 +147,27 @@ export default function Formations() {
     if (error) toast.error(error.message); else { toast.success("Statut mis à jour"); load(); }
   };
 
-  const StagiairesPicker = ({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void }) => (
-    <ScrollArea className="h-48 rounded-md border border-border/60 bg-background/40 p-2">
-      {stagiaires.length === 0 ? (
-        <p className="text-xs text-muted-foreground p-2">Aucun stagiaire. Créez-en d'abord dans l'onglet Stagiaires.</p>
-      ) : stagiaires.map((s) => (
-        <label key={s.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/40 cursor-pointer">
-          <Checkbox checked={selected.includes(s.id)} onCheckedChange={() => onToggle(s.id)} />
-          <span className="text-sm">{s.last_name.toUpperCase()} {s.first_name}</span>
-          {s.email && <span className="text-xs text-muted-foreground ml-auto">{s.email}</span>}
-        </label>
-      ))}
-    </ScrollArea>
-  );
+  const StagiairesPicker = ({ selected, onToggle, busy }: { selected: string[]; onToggle: (id: string) => void; busy: Set<string> }) => {
+    const available = stagiaires.filter((s) => !busy.has(s.id));
+    return (
+      <ScrollArea className="h-48 rounded-md border border-border/60 bg-background/40 p-2">
+        {stagiaires.length === 0 ? (
+          <p className="text-xs text-muted-foreground p-2">Aucun stagiaire. Créez-en d'abord dans l'onglet Stagiaires.</p>
+        ) : available.length === 0 ? (
+          <p className="text-xs text-muted-foreground p-2">Aucun stagiaire disponible sur ces dates (tous déjà inscrits sur une autre session).</p>
+        ) : available.map((s) => (
+          <label key={s.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/40 cursor-pointer">
+            <Checkbox checked={selected.includes(s.id)} onCheckedChange={() => onToggle(s.id)} />
+            <span className="text-sm">{s.last_name.toUpperCase()} {s.first_name}</span>
+            {s.email && <span className="text-xs text-muted-foreground ml-auto">{s.email}</span>}
+          </label>
+        ))}
+        {busy.size > 0 && available.length > 0 && (
+          <p className="text-[10px] text-muted-foreground/70 mt-2 px-1">{busy.size} stagiaire(s) masqué(s) car déjà inscrit(s) sur ces dates.</p>
+        )}
+      </ScrollArea>
+    );
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -172,7 +203,7 @@ export default function Formations() {
               <div><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
               <div>
                 <Label className="flex items-center gap-2"><Users className="h-4 w-4" /> Stagiaires inscrits ({selectedStagiaires.length})</Label>
-                <StagiairesPicker selected={selectedStagiaires} onToggle={(id) => toggleStagiaire(id, selectedStagiaires, setSelectedStagiaires)} />
+                <StagiairesPicker selected={selectedStagiaires} onToggle={(id) => toggleStagiaire(id, selectedStagiaires, setSelectedStagiaires)} busy={getBusyStagiaireIds(list, participantsByFormation, form.start_date, form.end_date)} />
               </div>
               <Button type="submit" className="w-full gradient-primary text-primary-foreground">Créer</Button>
             </form>
@@ -231,7 +262,7 @@ export default function Formations() {
           <DialogHeader><DialogTitle>Stagiaires — {manageFormation?.title}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">{manageSelected.length} sélectionné(s)</p>
-            <StagiairesPicker selected={manageSelected} onToggle={(id) => toggleStagiaire(id, manageSelected, setManageSelected)} />
+            <StagiairesPicker selected={manageSelected} onToggle={(id) => toggleStagiaire(id, manageSelected, setManageSelected)} busy={manageFormation ? getBusyStagiaireIds(list, participantsByFormation, manageFormation.start_date, manageFormation.end_date, manageFormation.id) : new Set()} />
             <Button className="w-full gradient-primary text-primary-foreground" onClick={saveManage}>Enregistrer</Button>
           </div>
         </DialogContent>
