@@ -203,7 +203,7 @@ export default function Formations() {
               <div><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
               <div>
                 <Label className="flex items-center gap-2"><Users className="h-4 w-4" /> Stagiaires inscrits ({selectedStagiaires.length})</Label>
-                <StagiairesPicker selected={selectedStagiaires} onToggle={(id) => toggleStagiaire(id, selectedStagiaires, setSelectedStagiaires)} />
+                <StagiairesPicker selected={selectedStagiaires} onToggle={(id) => toggleStagiaire(id, selectedStagiaires, setSelectedStagiaires)} busy={getBusyStagiaireIds(list, participantsByFormation, form.start_date, form.end_date)} />
               </div>
               <Button type="submit" className="w-full gradient-primary text-primary-foreground">Créer</Button>
             </form>
