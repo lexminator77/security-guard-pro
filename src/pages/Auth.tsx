@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Shield, Lock, Mail, User as UserIcon } from "lucide-react";
+import { Shield, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -15,16 +14,13 @@ const loginSchema = z.object({
   email: z.string().trim().email("Email invalide").max(255),
   password: z.string().min(6, "6 caractères minimum").max(72),
 });
-const signupSchema = loginSchema.extend({
-  fullName: z.string().trim().min(2, "Nom requis").max(100),
-});
 
 export default function Auth() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ email: "", password: "", fullName: "" });
+  const [forgot, setForgot] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "" });
 
   useEffect(() => { document.title = "Connexion — SecureCRM"; }, []);
 
@@ -34,19 +30,14 @@ export default function Auth() {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "signup") {
-        const parsed = signupSchema.parse(form);
-        const { error } = await supabase.auth.signUp({
-          email: parsed.email,
-          password: parsed.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: { full_name: parsed.fullName },
-          },
+      if (forgot) {
+        const email = z.string().email().parse(form.email);
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
-        toast.success("Compte créé ! Vérifiez votre boîte mail pour confirmer votre adresse avant de vous connecter.");
-        setMode("login");
+        toast.success("Email envoyé. Vérifie ta boîte de réception.");
+        setForgot(false);
       } else {
         const parsed = loginSchema.parse(form);
         const { error } = await supabase.auth.signInWithPassword({
@@ -75,36 +66,22 @@ export default function Auth() {
             <Shield className="h-7 w-7 text-primary-foreground" />
           </div>
           <h1 className="text-2xl font-display font-bold text-glow">SecureCRM</h1>
-          <p className="text-sm text-muted-foreground mt-1">Centre de gestion sécurité & formation</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {forgot ? "Réinitialiser le mot de passe" : "Connexion à votre espace"}
+          </p>
         </div>
 
-        <Tabs value={mode} onValueChange={(v) => setMode(v as any)} className="w-full">
-          <TabsList className="grid grid-cols-2 w-full mb-6">
-            <TabsTrigger value="login">Connexion</TabsTrigger>
-            <TabsTrigger value="signup">Inscription</TabsTrigger>
-          </TabsList>
-
-          <form onSubmit={handle} className="space-y-4">
-            <TabsContent value="signup" className="space-y-4 mt-0">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Nom complet</Label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="fullName" className="pl-9" placeholder="Jean Dupont"
-                    value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
-                </div>
-              </div>
-            </TabsContent>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input id="email" type="email" className="pl-9" placeholder="vous@exemple.fr"
-                  value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              </div>
+        <form onSubmit={handle} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input id="email" type="email" className="pl-9" placeholder="vous@exemple.fr"
+                value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </div>
+          </div>
 
+          {!forgot && (
             <div className="space-y-2">
               <Label htmlFor="password">Mot de passe</Label>
               <div className="relative">
@@ -113,15 +90,20 @@ export default function Auth() {
                   value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
               </div>
             </div>
+          )}
 
-            <Button type="submit" disabled={busy} className="w-full gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition-opacity">
-              {busy ? "..." : mode === "login" ? "Se connecter" : "Créer mon compte"}
-            </Button>
-          </form>
-        </Tabs>
+          <Button type="submit" disabled={busy} className="w-full gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition-opacity">
+            {busy ? "..." : forgot ? "Envoyer le lien" : "Se connecter"}
+          </Button>
+
+          <button type="button" onClick={() => setForgot(!forgot)}
+            className="text-xs text-muted-foreground hover:text-primary transition-colors w-full text-center">
+            {forgot ? "← Retour à la connexion" : "Mot de passe oublié ?"}
+          </button>
+        </form>
 
         <p className="text-xs text-muted-foreground text-center mt-6">
-          Le premier compte créé devient automatiquement administrateur.
+          L'accès se fait uniquement sur invitation de l'administrateur.
         </p>
       </Card>
     </div>

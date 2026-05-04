@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, GraduationCap, AlertTriangle,
-  Calendar, FileText, Building2, Bell, BarChart3, Shield, LogOut
+  Calendar, FileText, Building2, Bell, BarChart3, Shield, LogOut, UserCog
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -9,12 +9,15 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 
-const mainItems = [
-  { title: "Tableau de bord", url: "/", icon: LayoutDashboard },
-  { title: "Stagiaires", url: "/stagiaires", icon: Users },
-  { title: "Formations", url: "/formations", icon: GraduationCap },
-  { title: "Planning", url: "/planning", icon: Calendar },
-  { title: "Incidents", url: "/incidents", icon: AlertTriangle },
+type R = "administrateur" | "formateur" | "agent" | "secretaire" | "stagiaire";
+
+const allItems: { title: string; url: string; icon: any; roles: R[] }[] = [
+  { title: "Tableau de bord", url: "/", icon: LayoutDashboard, roles: ["administrateur","formateur","agent","secretaire","stagiaire"] },
+  { title: "Stagiaires", url: "/stagiaires", icon: Users, roles: ["administrateur","secretaire","formateur"] },
+  { title: "Formations", url: "/formations", icon: GraduationCap, roles: ["administrateur","secretaire","formateur","stagiaire"] },
+  { title: "Planning", url: "/planning", icon: Calendar, roles: ["administrateur","secretaire","formateur","stagiaire","agent"] },
+  { title: "Incidents", url: "/incidents", icon: AlertTriangle, roles: ["administrateur","secretaire","formateur","agent"] },
+  { title: "Utilisateurs", url: "/utilisateurs", icon: UserCog, roles: ["administrateur"] },
 ];
 
 const soonItems = [
@@ -28,8 +31,9 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, roles } = useAuth();
   const isActive = (p: string) => pathname === p;
+  const mainItems = allItems.filter((i) => i.roles.some((r) => (roles as R[]).includes(r)));
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
