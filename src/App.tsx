@@ -12,6 +12,7 @@ import Stagiaires from "./pages/Stagiaires";
 import Formations from "./pages/Formations";
 import Incidents from "./pages/Incidents";
 import Planning from "./pages/Planning";
+import Formateurs from "./pages/Formateurs";
 import Utilisateurs from "./pages/Utilisateurs";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -34,6 +35,7 @@ const App = () => (
               <Route path="/formations" element={<Formations />} />
               <Route path="/planning" element={<Planning />} />
               <Route path="/incidents" element={<Incidents />} />
+              <Route path="/formateurs" element={<Formateurs />} />
               <Route path="/utilisateurs" element={<Utilisateurs />} />
             </Route>
             <Route path="*" element={<NotFound />} />

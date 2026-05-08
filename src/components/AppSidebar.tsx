@@ -14,6 +14,7 @@ type R = "administrateur" | "formateur" | "agent" | "secretaire" | "stagiaire";
 const allItems: { title: string; url: string; icon: any; roles: R[] }[] = [
   { title: "Tableau de bord", url: "/", icon: LayoutDashboard, roles: ["administrateur","formateur","agent","secretaire","stagiaire"] },
   { title: "Stagiaires", url: "/stagiaires", icon: Users, roles: ["administrateur","secretaire","formateur"] },
+  { title: "Formateurs", url: "/formateurs", icon: UserCheck, roles: ["administrateur","secretaire"] },
   { title: "Formations", url: "/formations", icon: GraduationCap, roles: ["administrateur","secretaire","formateur","stagiaire"] },
   { title: "Planning", url: "/planning", icon: Calendar, roles: ["administrateur","secretaire","formateur","stagiaire","agent"] },
   { title: "Incidents", url: "/incidents", icon: AlertTriangle, roles: ["administrateur","secretaire","formateur","agent"] },
