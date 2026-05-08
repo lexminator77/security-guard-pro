@@ -14,6 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
+      email_reminders_log: {
+        Row: {
+          certification: string
+          expiry_date: string
+          id: string
+          months_before: number
+          recipient_email: string
+          recipient_id: string
+          recipient_type: string
+          sent_at: string
+        }
+        Insert: {
+          certification: string
+          expiry_date: string
+          id?: string
+          months_before: number
+          recipient_email: string
+          recipient_id: string
+          recipient_type: string
+          sent_at?: string
+        }
+        Update: {
+          certification?: string
+          expiry_date?: string
+          id?: string
+          months_before?: number
+          recipient_email?: string
+          recipient_id?: string
+          recipient_type?: string
+          sent_at?: string
+        }
+        Relationships: []
+      }
+      formateurs: {
+        Row: {
+          carte_pro_expiry: string | null
+          carte_pro_number: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          mac_aps_date: string | null
+          mac_aps_expiry: string | null
+          notes: string | null
+          phone: string | null
+          ssiap1_date: string | null
+          ssiap1_expiry: string | null
+          ssiap2_date: string | null
+          ssiap2_expiry: string | null
+          ssiap3_date: string | null
+          ssiap3_expiry: string | null
+          sst_date: string | null
+          sst_expiry: string | null
+          tfp_aps_date: string | null
+          tfp_aps_expiry: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          carte_pro_expiry?: string | null
+          carte_pro_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          mac_aps_date?: string | null
+          mac_aps_expiry?: string | null
+          notes?: string | null
+          phone?: string | null
+          ssiap1_date?: string | null
+          ssiap1_expiry?: string | null
+          ssiap2_date?: string | null
+          ssiap2_expiry?: string | null
+          ssiap3_date?: string | null
+          ssiap3_expiry?: string | null
+          sst_date?: string | null
+          sst_expiry?: string | null
+          tfp_aps_date?: string | null
+          tfp_aps_expiry?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          carte_pro_expiry?: string | null
+          carte_pro_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          mac_aps_date?: string | null
+          mac_aps_expiry?: string | null
+          notes?: string | null
+          phone?: string | null
+          ssiap1_date?: string | null
+          ssiap1_expiry?: string | null
+          ssiap2_date?: string | null
+          ssiap2_expiry?: string | null
+          ssiap3_date?: string | null
+          ssiap3_expiry?: string | null
+          sst_date?: string | null
+          sst_expiry?: string | null
+          tfp_aps_date?: string | null
+          tfp_aps_expiry?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       formation_participants: {
         Row: {
           created_at: string
@@ -189,6 +303,8 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          mac_aps_date: string | null
+          mac_aps_expiry: string | null
           notes: string | null
           phone: string | null
           photo_url: string | null
@@ -208,6 +324,8 @@ export type Database = {
           first_name: string
           id?: string
           last_name: string
+          mac_aps_date?: string | null
+          mac_aps_expiry?: string | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
@@ -227,6 +345,8 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          mac_aps_date?: string | null
+          mac_aps_expiry?: string | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null

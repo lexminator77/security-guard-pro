@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Users, GraduationCap, AlertTriangle, ShieldAlert, TrendingUp, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from "recharts";
+import ExpirationAlertsCard from "@/components/ExpirationAlertsCard";
 
 interface Stats {
   stagiaires: number;
@@ -106,6 +107,10 @@ export default function Dashboard() {
           </div>
         </Card>
 
+        <ExpirationAlertsCard />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-4">
         <Card className="p-6 bg-card/60 border-border/50">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="h-4 w-4 text-primary" />
