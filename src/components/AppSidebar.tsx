@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, GraduationCap, AlertTriangle,
-  Calendar, FileText, Building2, Bell, BarChart3, Shield, LogOut, UserCog
+  Calendar, FileText, Building2, Bell, BarChart3, Shield, LogOut, UserCog, UserCheck
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
