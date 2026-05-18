@@ -1381,13 +1381,14 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
     if (dejaScanne) { toast.info(`${pointNom} déjà scanné !`); return; }
     const { data, error } = await supabase.from("scans_ronde").insert({ ronde_id: rondeEnCours.id, point_controle_id: pointId, scanne_le: new Date().toISOString() }).select("*, point:points_controle(nom)").single();
     if (error) { toast.error(error.message); return; }
-    const newScans = [...scans, data];
+   const newScans = [...scans, data];
     setScans(newScans);
     toast.success(`✓ ${pointNom} scanné !`);
     // Vérifier si tous les points sont scannés
-    const circuit = circuits.find(c => c.id === rondeEnCours.circuit_id);
-    if (circuit && newScans.length >= circuit.points.length) {
-      toast.success("🎉 Tous les points scannés ! Ronde complète !");
+    const circuitActuel = circuits.find(c => c.id === rondeEnCours.circuit_id);
+    if (circuitActuel && newScans.length >= circuitActuel.points.length) {
+      setTimeout(() => toast.success("🎉 Tous les points scannés ! Ronde complète !"), 500);
+      await terminerRonde();
     }
   };
 
