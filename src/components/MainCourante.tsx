@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState, useRef } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1396,30 +1397,36 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
     setTimeout(async () => {
       if (!scannerDivRef.current) return;
       try {
-        const { Html5Qrcode } = await import("html5-qrcode");
-        const html5QrCode = new Html5Qrcode("qr-scanner-div");
-        scannerRef.current = html5QrCode;
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          { 
-            fps: 15, 
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-            disableFlip: false,
-          },
-          async (decodedText) => {
-            if (decodedText.startsWith("RONDE:")) {
-              const parts = decodedText.split(":");
+        const { BrowserMultiFormatReader } = await import("@zxing/browser");
+        const codeReader = new BrowserMultiFormatReader();
+        scannerRef.current = codeReader;
+
+        const videoElement = document.createElement("video");
+        videoElement.style.width = "100%";
+        videoElement.style.borderRadius = "8px";
+        scannerDivRef.current.innerHTML = "";
+        scannerDivRef.current.appendChild(videoElement);
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        videoElement.srcObject = stream;
+        videoElement.play();
+
+        scannerRef.current._stream = stream;
+
+        codeReader.decodeFromStream(stream, videoElement, (result, err) => {
+          if (result) {
+            const text = result.getText();
+            if (text.startsWith("RONDE:")) {
+              const parts = text.split(":");
               const pointId = parts[1];
               const pointNom = parts.slice(2).join(":");
-              await arreterScanner();
-              await scannerPoint(pointId, pointNom);
-            } else {
-              toast.error("QR code non reconnu");
+              arreterScanner();
+              scannerPoint(pointId, pointNom);
             }
-          },
-          () => {}
-        );
+          }
+        });
       } catch (err: any) {
         console.error("Scanner error:", err);
         toast.error("Caméra inaccessible — vérifiez les permissions");
@@ -1428,14 +1435,17 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
     }, 300);
   };
 
-  const arreterScanner = async () => {
+  const arreterScanner = () => {
     if (scannerRef.current) {
-      try { 
-        await scannerRef.current.stop();
-        await scannerRef.current.clear();
+      try {
+        if (scannerRef.current._stream) {
+          scannerRef.current._stream.getTracks().forEach((t: any) => t.stop());
+        }
+        BrowserMultiFormatReader.releaseAllStreams();
       } catch {}
       scannerRef.current = null;
     }
+    if (scannerDivRef.current) scannerDivRef.current.innerHTML = "";
     setScanning(false);
   };
 
