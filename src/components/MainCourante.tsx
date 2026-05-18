@@ -1404,29 +1404,26 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
         const videoElement = document.createElement("video");
         videoElement.style.width = "100%";
         videoElement.style.borderRadius = "8px";
+        videoElement.setAttribute("playsinline", "true");
         scannerDivRef.current.innerHTML = "";
         scannerDivRef.current.appendChild(videoElement);
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }
-        });
-        videoElement.srcObject = stream;
-        videoElement.play();
-
-        scannerRef.current._stream = stream;
-
-        codeReader.decodeFromStream(stream, videoElement, (result, err) => {
-          if (result) {
-            const text = result.getText();
-            if (text.startsWith("RONDE:")) {
-              const parts = text.split(":");
-              const pointId = parts[1];
-              const pointNom = parts.slice(2).join(":");
-              arreterScanner();
-              scannerPoint(pointId, pointNom);
+        await codeReader.decodeFromConstraints(
+          { video: { facingMode: "environment" } },
+          videoElement,
+          (result, err) => {
+            if (result) {
+              const text = result.getText();
+              if (text.startsWith("RONDE:")) {
+                const parts = text.split(":");
+                const pointId = parts[1];
+                const pointNom = parts.slice(2).join(":");
+                arreterScanner();
+                scannerPoint(pointId, pointNom);
+              }
             }
           }
-        });
+        );
       } catch (err: any) {
         console.error("Scanner error:", err);
         toast.error("Caméra inaccessible — vérifiez les permissions");
@@ -1438,10 +1435,7 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
   const arreterScanner = () => {
     if (scannerRef.current) {
       try {
-        if (scannerRef.current._stream) {
-          scannerRef.current._stream.getTracks().forEach((t: any) => t.stop());
-        }
-        BrowserMultiFormatReader.releaseAllStreams();
+        scannerRef.current.reset();
       } catch {}
       scannerRef.current = null;
     }
