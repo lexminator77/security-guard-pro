@@ -1395,35 +1395,45 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
     setScanResult(null);
     setTimeout(async () => {
       if (!scannerDivRef.current) return;
-      const { Html5Qrcode } = await import("html5-qrcode");
-      const html5QrCode = new Html5Qrcode("qr-scanner-div");
-      scannerRef.current = html5QrCode;
       try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        const html5QrCode = new Html5Qrcode("qr-scanner-div");
+        scannerRef.current = html5QrCode;
         await html5QrCode.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { 
+            fps: 15, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+            disableFlip: false,
+          },
           async (decodedText) => {
-            // Format attendu : RONDE:pointId:pointNom
             if (decodedText.startsWith("RONDE:")) {
               const parts = decodedText.split(":");
               const pointId = parts[1];
               const pointNom = parts.slice(2).join(":");
               await arreterScanner();
               await scannerPoint(pointId, pointNom);
+            } else {
+              toast.error("QR code non reconnu");
             }
           },
           () => {}
         );
-      } catch (err) {
-        toast.error("Impossible d'accéder à la caméra");
+      } catch (err: any) {
+        console.error("Scanner error:", err);
+        toast.error("Caméra inaccessible — vérifiez les permissions");
         setScanning(false);
       }
-    }, 100);
+    }, 300);
   };
 
   const arreterScanner = async () => {
     if (scannerRef.current) {
-      try { await scannerRef.current.stop(); } catch {}
+      try { 
+        await scannerRef.current.stop();
+        await scannerRef.current.clear();
+      } catch {}
       scannerRef.current = null;
     }
     setScanning(false);
