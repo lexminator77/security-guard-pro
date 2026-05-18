@@ -1412,12 +1412,13 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
           { video: { facingMode: "environment" } },
           videoElement,
           (result, err) => {
-            if (result) {
+            if (result && scannerRef.current) {
               const text = result.getText();
               if (text.startsWith("RONDE:")) {
                 const parts = text.split(":");
                 const pointId = parts[1];
                 const pointNom = parts.slice(2).join(":");
+                scannerRef.current = null; // bloque les appels suivants
                 arreterScanner();
                 scannerPoint(pointId, pointNom);
               }
