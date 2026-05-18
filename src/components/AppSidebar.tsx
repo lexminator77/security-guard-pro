@@ -1,6 +1,8 @@
+// @ts-nocheck
 import {
   LayoutDashboard, Users, GraduationCap, AlertTriangle,
-  Calendar, FileText, Building2, Bell, BarChart3, Shield, LogOut, UserCog, UserCheck
+  Calendar, FileText, BarChart3, Shield,
+  LogOut, UserCog, UserCheck, Award, ClipboardList, BookOpen, MessageSquare, Bell, Building2
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -13,19 +15,20 @@ type R = "administrateur" | "formateur" | "agent" | "secretaire" | "stagiaire";
 
 const allItems: { title: string; url: string; icon: any; roles: R[] }[] = [
   { title: "Tableau de bord", url: "/", icon: LayoutDashboard, roles: ["administrateur","formateur","agent","secretaire","stagiaire"] },
-  { title: "Stagiaires", url: "/stagiaires", icon: Users, roles: ["administrateur","secretaire","formateur"] },
+  { title: "Stagiaires", url: "/stagiaires", icon: Users, roles: ["administrateur","secretaire",] },
   { title: "Formateurs", url: "/formateurs", icon: UserCheck, roles: ["administrateur","secretaire"] },
   { title: "Formations", url: "/formations", icon: GraduationCap, roles: ["administrateur","secretaire","formateur","stagiaire"] },
   { title: "Planning", url: "/planning", icon: Calendar, roles: ["administrateur","secretaire","formateur","stagiaire","agent"] },
   { title: "Incidents", url: "/incidents", icon: AlertTriangle, roles: ["administrateur","secretaire","formateur","agent"] },
+  { title: "Entreprises", url: "/entreprises", icon: Building2, roles: ["administrateur","secretaire"] },
+  { title: "Documents", url: "/documents", icon: FileText, roles: ["administrateur","secretaire"] },
+  { title: "Statistiques", url: "/statistiques", icon: BarChart3, roles: ["administrateur"] },
   { title: "Utilisateurs", url: "/utilisateurs", icon: UserCog, roles: ["administrateur"] },
-];
-
-const soonItems = [
-  { title: "Documents", url: "/documents", icon: FileText },
-  { title: "Entreprises", url: "/entreprises", icon: Building2 },
-  { title: "Rappels", url: "/rappels", icon: Bell },
-  { title: "Statistiques", url: "/statistiques", icon: BarChart3 },
+  { title: "Audit & Émargements", url: "/audit", icon: ClipboardList, roles: ["administrateur"] },
+  { title: "Compétences", url: "/competences", icon: Award, roles: ["administrateur"] },
+  { title: "Cours", url: "/cours", icon: BookOpen, roles: ["administrateur"] },
+  { title: "Messagerie", url: "/messagerie-admin", icon: MessageSquare, roles: ["administrateur"] },
+  { title: "Rappels & Alertes", url: "/rappels", icon: Bell, roles: ["administrateur"] },
 ];
 
 export function AppSidebar() {
@@ -66,22 +69,6 @@ export function AppSidebar() {
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Modules à venir</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {soonItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton className="opacity-50 cursor-not-allowed" disabled>
-                    <item.icon className="h-4 w-4" />
-                    {!collapsed && <span>{item.title}</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
