@@ -1420,8 +1420,10 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
                 const pointId = parts[1];
                 const pointNom = parts.slice(2).join(":");
                 scannerRef.current = null; // bloque les appels suivants
-                arreterScanner();
-                scannerPoint(pointId, pointNom);
+                setTimeout(async () => {
+                  arreterScanner();
+                  await scannerPoint(pointId, pointNom);
+                }, 200);
               }
             }
           }
