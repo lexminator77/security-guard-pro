@@ -182,6 +182,8 @@ const [menuOpsOpen, setMenuOpsOpen] = useState(false);
     setCompetences(cv ?? []);
     setEmargements(em ?? []);
     setMessages(msgs ?? []);
+    const nonLus = (msgs ?? []).filter((m: any) => m.de_formateur_id && !m.lu).length;
+setUnreadFromFormateur(nonLus);
   };
 
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,7 +234,7 @@ const [menuOpsOpen, setMenuOpsOpen] = useState(false);
     { id: "competences", label: "Mes compétences", icon: Award },
     { id: "documents", label: "Mes documents", icon: FileText },
     { id: "cours", label: "Mes cours", icon: BookOpen },
-    { id: "messagerie", label: "Messagerie", icon: MessageSquare },
+    { id: "messagerie", label: "Messagerie", icon: MessageSquare, badge: unreadFromFormateur },
     
     { id: "maincourante_nouveau", label: "Nouveau", icon: Plus, parent: "maincourante", parentLabel: "Main courante" },
     { id: "maincourante_consulter", label: "Consulter", icon: Eye, parent: "maincourante", parentLabel: "Main courante" },
@@ -316,10 +318,12 @@ const [menuOpsOpen, setMenuOpsOpen] = useState(false);
   )}
 </div>
         {/* Autres items */}
-        {navItems.filter(n => !n.parent).map(({ id, label, icon: Icon }) => (
+        {navItems.filter(n => !n.parent).map(({ id, label, icon: Icon, badge }) => (
           <button key={id} onClick={() => { setPage(id as Page); setSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${page === id ? "bg-primary/20 text-primary font-medium" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"}`}>
-            <Icon className="h-4 w-4 flex-shrink-0" />{label}
+            <Icon className="h-4 w-4 flex-shrink-0" />
+            <span className="flex-1 text-left">{label}</span>
+            {badge > 0 && <span className="h-5 w-5 rounded-full bg-orange-500 text-white text-[10px] flex items-center justify-center font-bold">{badge}</span>}
           </button>
         ))}
       </nav>

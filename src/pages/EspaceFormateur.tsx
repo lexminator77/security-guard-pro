@@ -23,6 +23,7 @@ function MessagerieChat({ stagiaireId, stagiaireNom, formationId, formationNom, 
   stagiaireId: string; stagiaireNom: string; formationId: string; formationNom: string; formateurId: string;
 }) {
   const [messages, setMessages] = useState<any[]>([]);
+  const [unreadFromFormateur, setUnreadFromFormateur] = useState(0);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -91,6 +92,7 @@ export default function EspaceFormateur() {
   const [emargements, setEmargements] = useState<any[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadPerStagiaire, setUnreadPerStagiaire] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -142,8 +144,20 @@ export default function EspaceFormateur() {
       setParticipants(grouped);
       const stagiaireIds = (parts ?? []).map((p: any) => p.stagiaire?.id).filter(Boolean);
       if (stagiaireIds.length > 0) {
-        const { count } = await supabase.from("messages").select("*", { count: "exact", head: true }).in("a_stagiaire_id", stagiaireIds).not("de_stagiaire_id", "is", null).eq("lu", false);
-        setUnreadCount(count ?? 0);
+        const { data: unreadData } = await supabase
+          .from("messages")
+          .select("a_stagiaire_id")
+          .in("a_stagiaire_id", stagiaireIds)
+          .not("de_stagiaire_id", "is", null)
+          .eq("lu", false);
+        const unreadMap: Record<string, number> = {};
+        (unreadData ?? []).forEach((m: any) => {
+          unreadMap[m.a_stagiaire_id] = (unreadMap[m.a_stagiaire_id] ?? 0) + 1;
+        });
+        setUnreadCount(Object.values(unreadMap).reduce((a, b) => a + b, 0));
+        setUnreadPerStagiaire(unreadMap);
+
+
       }
     }
   };
@@ -502,21 +516,33 @@ export default function EspaceFormateur() {
           <Card className="p-12 text-center text-muted-foreground text-sm border-dashed">Aucun stagiaire dans vos formations</Card>
         ) : (
           <Card className="divide-y divide-border/50 overflow-hidden">
-            {tousLesStagiaires.map(({ stagiaire, formation }, i) => (
-              <button key={i} onClick={() => openMessagerie(stagiaire, formation)}
-                className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors text-left">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
-                    {stagiaire?.first_name?.[0]}{stagiaire?.last_name?.[0]}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{stagiaire?.first_name} {stagiaire?.last_name}</p>
-                    <p className="text-xs text-muted-foreground">{formation?.title} — {formation?.type}</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-            ))}
+            {tousLesStagiaires.map(({ stagiaire, formation }, i) => {
+  const nbNonLus = unreadPerStagiaire[stagiaire?.id] ?? 0;
+  return (
+    <button key={i} onClick={() => openMessagerie(stagiaire, formation)}
+      className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors text-left">
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <div className="h-9 w-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
+            {stagiaire?.first_name?.[0]}{stagiaire?.last_name?.[0]}
+          </div>
+          {nbNonLus > 0 && (
+            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-orange-500 text-white text-[10px] flex items-center justify-center font-bold">
+              {nbNonLus}
+            </span>
+          )}
+        </div>
+        <div>
+          <p className={`text-sm font-medium ${nbNonLus > 0 ? "text-orange-400" : ""}`}>
+            {stagiaire?.first_name} {stagiaire?.last_name}
+          </p>
+          <p className="text-xs text-muted-foreground">{formation?.title} — {formation?.type}</p>
+        </div>
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    </button>
+  );
+})}
           </Card>
         )}
       </div>
