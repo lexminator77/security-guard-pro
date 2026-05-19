@@ -23,7 +23,7 @@ function MessagerieChat({ stagiaireId, stagiaireNom, formationId, formationNom, 
   stagiaireId: string; stagiaireNom: string; formationId: string; formationNom: string; formateurId: string;
 }) {
   const [messages, setMessages] = useState<any[]>([]);
-  const [unreadFromFormateur, setUnreadFromFormateur] = useState(0);
+  
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);

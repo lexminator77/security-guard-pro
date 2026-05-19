@@ -113,6 +113,7 @@ export default function EspaceStagiaire() {
   const [competences, setCompetences] = useState<any[]>([]);
   const [emargements, setEmargements] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [unreadFromFormateur, setUnreadFromFormateur] = useState(0);
   const [openChapitre, setOpenChapitre] = useState<string | null>(null);
   const [menuMCOpen, setMenuMCOpen] = useState(false);
 const [menuOpsOpen, setMenuOpsOpen] = useState(false);
