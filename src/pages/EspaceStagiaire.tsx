@@ -642,7 +642,9 @@ setUnreadFromFormateur(nonLus);
       case "competences": return <PageCompetences />;
       case "documents": return <PageDocuments />;
       case "cours": return <PageCours />;
-      case "messagerie": return <Messagerie messages={messages} setMessages={setMessages} stagiaireId={stagiaireId!} />;
+      case "messagerie": 
+  setUnreadFromFormateur(0);
+  return <Messagerie messages={messages} setMessages={setMessages} stagiaireId={stagiaireId!} />;
     case "consignes": return <ConsignesStagiaire />;
     case "permisfeu": return <PermisFeuStagiaire stagiaireId={stagiaireId!} formations={formations} />; 
     case "statistiques": return <StatistiquesStagiaire stagiaireId={stagiaireId!} />;
