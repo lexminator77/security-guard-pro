@@ -114,6 +114,9 @@ export default function EspaceStagiaire() {
   const [emargements, setEmargements] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [unreadFromFormateur, setUnreadFromFormateur] = useState(0);
+  useEffect(() => {
+  if (page === "messagerie") setUnreadFromFormateur(0);
+}, [page]);
   const [openChapitre, setOpenChapitre] = useState<string | null>(null);
   const [menuMCOpen, setMenuMCOpen] = useState(false);
 const [menuOpsOpen, setMenuOpsOpen] = useState(false);
@@ -642,9 +645,7 @@ setUnreadFromFormateur(nonLus);
       case "competences": return <PageCompetences />;
       case "documents": return <PageDocuments />;
       case "cours": return <PageCours />;
-      case "messagerie": 
-  setUnreadFromFormateur(0);
-  return <Messagerie messages={messages} setMessages={setMessages} stagiaireId={stagiaireId!} />;
+      case "messagerie": return <Messagerie messages={messages} setMessages={setMessages} stagiaireId={stagiaireId!} />;
     case "consignes": return <ConsignesStagiaire />;
     case "permisfeu": return <PermisFeuStagiaire stagiaireId={stagiaireId!} formations={formations} />; 
     case "statistiques": return <StatistiquesStagiaire stagiaireId={stagiaireId!} />;
