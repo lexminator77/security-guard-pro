@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
 import { appliquerFiltreDateRange, FiltreDateRange, FiltreDateValue } from "../components/FiltreDateRange"
 
@@ -49,6 +49,9 @@ describe("appliquerFiltreDateRange — preset: mois", () => {
   })
   it("retourne false pour une date il y a 31 jours", () => {
     expect(appliquerFiltreDateRange(daysAgo(31), { type: "preset", preset: "mois" })).toBe(false)
+  })
+  it("retourne false si dateStr est null", () => {
+    expect(appliquerFiltreDateRange(null, { type: "preset", preset: "mois" })).toBe(false)
   })
 })
 
