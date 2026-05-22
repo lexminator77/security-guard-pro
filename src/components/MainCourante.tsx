@@ -528,7 +528,7 @@ export function ConsignesFormateur({ formateurId }: { formateurId: string }) {
           </div>
         </Card>
       )}
-      <FiltreDateRange value={filtreDateRange} onChange={setFiltreDateRange} />
+      {!showForm && <FiltreDateRange value={filtreDateRange} onChange={setFiltreDateRange} />}
       {loading ? <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p>
         : consignesFiltrees.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">{consignes.length === 0 ? "Aucune consigne créée" : "Aucune consigne sur cette période"}</p></Card>
         : <div className="space-y-3">{consignesFiltrees.map(c => (
@@ -589,7 +589,7 @@ export function ConsignesStagiaire() {
       </div>
       <FiltreDateRange value={filtreDateRange} onChange={setFiltreDateRange} />
       {loading ? <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p>
-        : consignesFiltrees.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">Aucune consigne sur cette période</p></Card>
+        : consignesFiltrees.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">{consignes.length === 0 ? "Aucune consigne pour le moment" : "Aucune consigne sur cette période"}</p></Card>
         : <div className="space-y-3">{consignesFiltrees.map(c => (
           <Card key={c.id} className="p-5 bg-card/60 border-border/50 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -652,7 +652,7 @@ export function PermisFeuStagiaire({ stagiaireId, formations }: { stagiaireId: s
       </div>
       <FiltreDateRange value={filtreDateRange} onChange={setFiltreDateRange} />
       {loading ? <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p>
-        : permisFiltres.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">Aucun permis {onglet === "archive" ? "archivé" : "en cours"}</p></Card>
+        : permisFiltres.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">{permis.length === 0 ? "Aucun permis de feu enregistré" : onglet === "archive" ? "Aucun permis archivé sur cette période" : "Aucun permis en cours sur cette période"}</p></Card>
         : <div className="space-y-3">{permisFiltres.map(p => (
           <Card key={p.id} className="p-5 bg-card/60 border-border/50 space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -911,7 +911,7 @@ export function PermisFeuFormateur() {
       </div>
       <FiltreDateRange value={filtreDateRange} onChange={setFiltreDateRange} />
       {loading ? <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p>
-        : permisFiltres.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">Aucun permis</p></Card>
+        : permisFiltres.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">{permis.length === 0 ? "Aucun permis de feu enregistré" : "Aucun permis sur cette période"}</p></Card>
         : <div className="space-y-3">{permisFiltres.map(p => (
           <Card key={p.id} className="p-5 bg-card/60 border-border/50 space-y-3">
             <div className="flex items-start justify-between gap-3">
