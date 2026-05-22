@@ -560,7 +560,7 @@ export function ConsignesStagiaire() {
   const [consignes, setConsignes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtreType, setFiltreType] = useState<"toutes" | "generale" | "temporaire" | "urgente">("toutes");
-  const [filtrePeriode, setFiltrePeriode] = useState<"toutes" | "aujourd_hui" | "semaine" | "mois">("toutes");
+  const [filtreDateRange, setFiltreDateRange] = useState<FiltreDateValue>({ type: "preset", preset: "toutes" });
 
   useEffect(() => {
     const load = async () => {
@@ -573,13 +573,7 @@ export function ConsignesStagiaire() {
 
   const consignesFiltrees = consignes.filter(c => {
     if (filtreType !== "toutes" && c.type !== filtreType) return false;
-    if (filtrePeriode !== "toutes") {
-      const date = new Date(c.created_at); const now = new Date();
-      if (filtrePeriode === "aujourd_hui") return date.toDateString() === now.toDateString();
-      if (filtrePeriode === "semaine") { const s = new Date(now); s.setDate(s.getDate() - 7); return date >= s; }
-      if (filtrePeriode === "mois") { const m = new Date(now); m.setMonth(m.getMonth() - 1); return date >= m; }
-    }
-    return true;
+    return appliquerFiltreDateRange(c.created_at, filtreDateRange);
   });
 
   return (
@@ -593,12 +587,7 @@ export function ConsignesStagiaire() {
           </button>
         ))}
       </div>
-      <div className="flex gap-2 flex-wrap">
-        {([["toutes", "Toutes les dates"], ["aujourd_hui", "Aujourd'hui"], ["semaine", "7 derniers jours"], ["mois", "30 derniers jours"]] as const).map(([id, label]) => (
-          <button key={id} onClick={() => setFiltrePeriode(id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filtrePeriode === id ? "bg-primary/20 text-primary" : "bg-muted/30 text-muted-foreground hover:bg-muted/50"}`}>{label}</button>
-        ))}
-      </div>
+      <FiltreDateRange value={filtreDateRange} onChange={setFiltreDateRange} />
       {loading ? <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p>
         : consignesFiltrees.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">Aucune consigne sur cette période</p></Card>
         : <div className="space-y-3">{consignesFiltrees.map(c => (
