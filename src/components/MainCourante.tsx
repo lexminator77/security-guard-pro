@@ -891,6 +891,7 @@ export function PermisFeuFormateur() {
   const [permis, setPermis] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [onglet, setOnglet] = useState<"actif" | "archive">("actif");
+  const [filtreDateRange, setFiltreDateRange] = useState<FiltreDateValue>({ type: "preset", preset: "toutes" });
 
   useEffect(() => {
     const load = async () => {
@@ -901,7 +902,11 @@ export function PermisFeuFormateur() {
     load();
   }, []);
 
-  const permisFiltres = permis.filter(p => onglet === "actif" ? p.statut !== "archive" : p.statut === "archive");
+  const permisFiltres = permis.filter(p => {
+    const matchOnglet = onglet === "actif" ? p.statut !== "archive" : p.statut === "archive";
+    if (!matchOnglet) return false;
+    return appliquerFiltreDateRange(p.date_debut, filtreDateRange);
+  });
 
   return (
     <div className="space-y-6">
@@ -915,6 +920,7 @@ export function PermisFeuFormateur() {
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${onglet === id ? "bg-primary/20 text-primary" : "bg-muted/30 text-muted-foreground hover:bg-muted/50"}`}>{label}</button>
         ))}
       </div>
+      <FiltreDateRange value={filtreDateRange} onChange={setFiltreDateRange} />
       {loading ? <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p>
         : permisFiltres.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">Aucun permis</p></Card>
         : <div className="space-y-3">{permisFiltres.map(p => (
