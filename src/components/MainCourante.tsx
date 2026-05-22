@@ -10,6 +10,7 @@ import {
   FileText, Eye, X
 } from "lucide-react";
 import { toast } from "sonner";
+import { FiltreDateRange, FiltreDateValue, appliquerFiltreDateRange } from "./FiltreDateRange";
 
 const FAMILLES = [
   "ACCIDENT", "ALERTE", "INCIDENT TECHNIQUE", "INCIDENTS SURETE",
@@ -474,6 +475,7 @@ export function ConsignesFormateur({ formateurId }: { formateurId: string }) {
   const [type, setType] = useState("generale");
   const [dateFin, setDateFin] = useState("");
   const [saving, setSaving] = useState(false);
+  const [filtreDateRange, setFiltreDateRange] = useState<FiltreDateValue>({ type: "preset", preset: "toutes" });
 
   const load = async () => {
     setLoading(true);
@@ -495,6 +497,10 @@ export function ConsignesFormateur({ formateurId }: { formateurId: string }) {
 
   const inputCls = "w-full bg-muted/30 border border-border/50 rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary";
   const selectCls = `${inputCls} cursor-pointer`;
+
+  const consignesFiltrees = consignes.filter(c =>
+    appliquerFiltreDateRange(c.created_at, filtreDateRange)
+  );
 
   return (
     <div className="space-y-6">
@@ -522,9 +528,10 @@ export function ConsignesFormateur({ formateurId }: { formateurId: string }) {
           </div>
         </Card>
       )}
+      <FiltreDateRange value={filtreDateRange} onChange={setFiltreDateRange} />
       {loading ? <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p>
-        : consignes.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">Aucune consigne créée</p></Card>
-        : <div className="space-y-3">{consignes.map(c => (
+        : consignesFiltrees.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">{consignes.length === 0 ? "Aucune consigne créée" : "Aucune consigne sur cette période"}</p></Card>
+        : <div className="space-y-3">{consignesFiltrees.map(c => (
           <Card key={c.id} className={`p-5 border-border/50 space-y-2 ${!c.actif ? "opacity-50" : ""}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
