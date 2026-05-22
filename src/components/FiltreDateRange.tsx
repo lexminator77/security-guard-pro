@@ -16,14 +16,14 @@ export function appliquerFiltreDateRange(
       const s = new Date(now); s.setDate(s.getDate() - 7); return date >= s
     }
     if (filtre.preset === "mois") {
-      const m = new Date(now); m.setMonth(m.getMonth() - 1); return date >= m
+      const m = new Date(now); m.setDate(m.getDate() - 30); return date >= m
     }
   }
   if (filtre.type === "range") {
     if (!dateStr) return false
     const date = new Date(dateStr)
     if (filtre.from && date < new Date(filtre.from)) return false
-    if (filtre.to && date > new Date(filtre.to + "T23:59:59")) return false
+    if (filtre.to && date > new Date(filtre.to + "T23:59:59.999Z")) return false
     return true
   }
   return true
@@ -58,6 +58,7 @@ export function FiltreDateRange({ value, onChange }: FiltreDateRangeProps) {
         {PRESETS.map(p => (
           <button
             key={p.id}
+            disabled={isRange}
             onClick={() => onChange({ type: "preset", preset: p.id })}
             className={`${BTN} ${activePreset === p.id ? ACTIVE : INACTIVE}`}
           >
