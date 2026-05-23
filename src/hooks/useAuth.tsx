@@ -18,16 +18,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
+  // loading=true until both session AND roles are known
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(false);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        setTimeout(() => fetchRoles(s.user.id), 0);
+        // Show spinner while roles load on SIGNED_IN; TOKEN_REFRESHED reloads silently
+        if (_evt === "SIGNED_IN") setRolesLoading(true);
+        setTimeout(async () => {
+          await fetchRoles(s.user.id);
+          setRolesLoading(false);
+        }, 0);
       } else {
         setRoles([]);
+        setRolesLoading(false);
       }
     });
 
@@ -52,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ user, session, roles, loading, signOut }}>
+    <Ctx.Provider value={{ user, session, roles, loading: loading || rolesLoading, signOut }}>
       {children}
     </Ctx.Provider>
   );
