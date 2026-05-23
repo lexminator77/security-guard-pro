@@ -30,7 +30,8 @@ export const RECYCLAGE_TYPE: Record<CertType, CertType> = {
 
 export function daysUntilExpiry(dateStr: string | null | undefined): number | null {
   if (!dateStr) return null;
-  return Math.round((new Date(dateStr).getTime() - Date.now()) / 86400000);
+  const todayMidnight = new Date(new Date().toISOString().slice(0, 10)).getTime();
+  return Math.round((new Date(dateStr).getTime() - todayMidnight) / 86400000);
 }
 
 export function certStatusBadge(dateExpiration: string): CertStatusBadge {
