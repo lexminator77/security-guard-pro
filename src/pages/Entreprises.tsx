@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Plus, Pencil, Trash2, Search, Users, Phone, Mail, MapPin } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2, Search, Users, Phone, Mail, MapPin, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 interface Entreprise {
@@ -159,6 +159,10 @@ export default function Entreprises() {
   const [selectedEntreprise, setSelectedEntreprise] = useState<Entreprise | null>(null);
   const [linkedStagiaires, setLinkedStagiaires] = useState<string[]>([]);
   const [savingLinks, setSavingLinks] = useState(false);
+  const [openRH, setOpenRH] = useState(false);
+  const [rhAccount, setRhAccount] = useState<{ email: string; user_id: string } | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
     document.title = "Entreprises — SecureCRM";
@@ -269,6 +273,57 @@ export default function Entreprises() {
     load();
   };
 
+  const loadRhAccount = async (entrepriseId: string) => {
+    const { data } = await supabase
+      .from("entreprise_rh")
+      .select("user_id")
+      .eq("entreprise_id", entrepriseId)
+      .maybeSingle();
+    setRhAccount(data ? { user_id: data.user_id, email: "Compte actif" } : null);
+  };
+
+  const openRHDialog = async (e: Entreprise) => {
+    setSelectedEntreprise(e);
+    setInviteEmail("");
+    await loadRhAccount(e.id);
+    setOpenRH(true);
+  };
+
+  const handleInviteRH = async () => {
+    if (!inviteEmail || !selectedEntreprise) return;
+    setInviting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const edgeUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-rh`;
+      const res = await fetch(edgeUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ email: inviteEmail, entreprise_id: selectedEntreprise.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur invitation");
+      toast.success(`Invitation envoyée à ${inviteEmail}`);
+      setInviteEmail("");
+      await loadRhAccount(selectedEntreprise.id);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRevokeRH = async () => {
+    if (!rhAccount || !selectedEntreprise) return;
+    if (!window.confirm("Révoquer l'accès RH ? Le compte ne pourra plus se connecter à l'espace RH.")) return;
+    await supabase.from("entreprise_rh").delete().eq("user_id", rhAccount.user_id);
+    await supabase.from("user_roles").delete().eq("user_id", rhAccount.user_id).eq("role", "rh");
+    setRhAccount(null);
+    toast.success("Accès RH révoqué");
+  };
+
   const filtered = entreprises.filter((e) =>
     e.nom.toLowerCase().includes(search.toLowerCase()) ||
     (e.ville ?? "").toLowerCase().includes(search.toLowerCase()) ||
@@ -372,6 +427,9 @@ export default function Entreprises() {
                       <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(e.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                      <Button variant="ghost" size="icon" onClick={() => openRHDialog(e)} title="Compte RH">
+                        <UserPlus className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -455,6 +513,55 @@ export default function Entreprises() {
               {savingLinks ? "Enregistrement..." : "Enregistrer"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog compte RH */}
+      <Dialog open={openRH} onOpenChange={setOpenRH}>
+        <DialogContent className="max-w-md bg-card border-border/50">
+          <DialogHeader>
+            <DialogTitle>Compte RH — {selectedEntreprise?.nom}</DialogTitle>
+          </DialogHeader>
+
+          {rhAccount ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/40 border border-border/50">
+                <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{rhAccount.email}</p>
+                  <p className="text-xs text-muted-foreground">Compte actif</p>
+                </div>
+                <Badge className="bg-success/20 text-success border-success/30 text-xs shrink-0">Actif</Badge>
+              </div>
+              <Button variant="destructive" size="sm" onClick={handleRevokeRH} className="w-full">
+                Révoquer l'accès
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Aucun compte RH. Invitez un contact par email — il recevra un lien pour créer son mot de passe.
+              </p>
+              <div className="space-y-1.5">
+                <Label htmlFor="rh-email">Email du contact RH</Label>
+                <Input
+                  id="rh-email"
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="rh@entreprise.fr"
+                  className="bg-secondary/50"
+                />
+              </div>
+              <Button
+                onClick={handleInviteRH}
+                disabled={!inviteEmail || inviting}
+                className="w-full gradient-primary"
+              >
+                {inviting ? "Envoi en cours…" : "Envoyer l'invitation"}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
