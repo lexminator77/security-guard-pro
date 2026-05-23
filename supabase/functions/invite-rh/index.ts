@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const SITE_URL = Deno.env.get("SITE_URL") ?? "http://localhost:5173";
+  const SITE_URL = Deno.env.get("SITE_URL") ?? "http://localhost:8081";
   const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(email, {
     redirectTo: `${SITE_URL}/reset-password`,
   });
