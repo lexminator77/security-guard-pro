@@ -11,7 +11,9 @@ import {
   Award, X, PenLine, MessageSquare, Send
 } from "lucide-react";
 import { toast } from "sonner";
-import { PageMainCourante, ConsignesStagiaire, PermisFeuStagiaire, StatistiquesStagiaire, RondierStagiaire } from "@/components/MainCourante";const STATUS_COLOR: Record<string, string> = {
+import { PageMainCourante, ConsignesStagiaire, PermisFeuStagiaire, StatistiquesStagiaire, RondierStagiaire } from "@/components/MainCourante";
+import { CERT_LABELS, RECYCLAGE_TYPE, certStatusBadge, daysUntilExpiry } from "@/lib/certificationUtils";
+import type { Certification } from "@/types/certifications";const STATUS_COLOR: Record<string, string> = {
   valide: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
   en_attente: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   rejete: "bg-red-500/20 text-red-400 border-red-500/30",
@@ -114,6 +116,8 @@ export default function EspaceStagiaire() {
   const [emargements, setEmargements] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [unreadFromFormateur, setUnreadFromFormateur] = useState(0);
+  const [certifications, setCertifications] = useState<Certification[]>([]);
+  const [recyclageSessions, setRecyclageSessions] = useState<Record<string, any>>({});
   useEffect(() => {
   if (page === "messagerie") setUnreadFromFormateur(0);
 }, [page]);
@@ -188,6 +192,45 @@ const [menuOpsOpen, setMenuOpsOpen] = useState(false);
     setMessages(msgs ?? []);
     const nonLus = (msgs ?? []).filter((m: any) => m.de_formateur_id && !m.lu).length;
 setUnreadFromFormateur(nonLus);
+
+    // Fetch certifications
+    const { data: certs } = await supabase
+      .from("certifications")
+      .select("*")
+      .eq("stagiaire_id", sid)
+      .order("date_expiration", { ascending: true });
+    const certsList: Certification[] = certs ?? [];
+    setCertifications(certsList);
+
+    // Fetch recyclage sessions for certs expiring within 90 days
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const in90Date = new Date();
+    in90Date.setDate(in90Date.getDate() + 90);
+    const in90Str = in90Date.toISOString().slice(0, 10);
+
+    const urgentCerts = certsList.filter((c) => {
+      const days = daysUntilExpiry(c.date_expiration) ?? Infinity;
+      return days <= 90;
+    });
+
+    const sessionsMap: Record<string, any> = {};
+    await Promise.all(
+      urgentCerts.map(async (c) => {
+        const recyclageType = (RECYCLAGE_TYPE[c.type]?.toUpperCase() ?? c.type.toUpperCase());
+        const { data: sessions } = await supabase
+          .from("formations")
+          .select("id, title, start_date, location")
+          .eq("type", recyclageType)
+          .gte("start_date", todayStr)
+          .lte("start_date", in90Str)
+          .order("start_date")
+          .limit(1);
+        if (sessions && sessions.length > 0) {
+          sessionsMap[c.type] = sessions[0];
+        }
+      })
+    );
+    setRecyclageSessions(sessionsMap);
   };
 
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -414,6 +457,58 @@ setUnreadFromFormateur(nonLus);
           </div>
         </Card>
       ))}
+
+      {/* Mes certifications */}
+      <div>
+        <h2 className="font-semibold flex items-center gap-2 mb-3 text-sm text-muted-foreground uppercase tracking-wider">
+          <Award className="h-4 w-4" /> Mes certifications
+        </h2>
+        {certifications.length === 0 ? (
+          <Card className="p-8 text-center text-muted-foreground text-sm border-dashed">
+            Aucune certification enregistrée
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {certifications.map((cert) => {
+              const badge = certStatusBadge(cert.date_expiration);
+              const days = daysUntilExpiry(cert.date_expiration);
+              const needsSession = badge.status === "urgent" || badge.status === "expire";
+              const session = recyclageSessions[cert.type];
+              const [y, m, d] = cert.date_expiration.split("-");
+              const expireDateFr = `${d}/${m}/${y}`;
+              return (
+                <Card key={cert.id} className="p-5 bg-card/60 border-border/50">
+                  <div className="flex items-start justify-between mb-3">
+                    <p className="font-medium">{CERT_LABELS[cert.type] ?? cert.type}</p>
+                    <Badge variant="outline" className={badge.className}>{badge.label}</Badge>
+                  </div>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <p>Expire le : <span className="font-medium text-foreground">{expireDateFr}</span></p>
+                    {days !== null && (
+                      <p>Jours restants : <span className="font-medium text-foreground">{days}</span></p>
+                    )}
+                  </div>
+                  {needsSession && (
+                    <div className="mt-3">
+                      {session ? (
+                        <a href="/formations" className="block rounded-md bg-emerald-500/10 border border-emerald-500/30 px-4 py-2.5 text-xs text-emerald-400 hover:bg-emerald-500/20 transition-colors">
+                          Session disponible : <span className="font-medium">{session.title}</span>
+                          {" — "}{(() => { const [sy, sm, sd] = session.start_date.split("-"); return `${sd}/${sm}/${sy}`; })()}
+                          {session.location && <span className="text-emerald-300"> — {session.location}</span>}
+                        </a>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic mt-1">
+                          Contactez votre formateur pour planifier un recyclage
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 
