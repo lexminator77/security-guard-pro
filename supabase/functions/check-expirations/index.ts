@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
           const expiryFr = cert.date_expiration.split("-").reverse().join("/");
           const sessionsHtml = (sessions ?? []).length > 0
             ? `<ul>${(sessions ?? []).map((s: any) =>
-                `<li>${esc(s.title)} — ${new Date(s.start_date).toLocaleDateString("fr-FR")}${s.location ? ` — ${esc(s.location ?? "")}` : ""}</li>`
+                `<li>${esc(s.title)} — ${s.start_date.split("-").reverse().join("/")}${s.location ? ` — ${esc(s.location ?? "")}` : ""}</li>`
               ).join("")}</ul>`
             : "<p>Contactez votre formateur pour planifier un recyclage.</p>";
 
