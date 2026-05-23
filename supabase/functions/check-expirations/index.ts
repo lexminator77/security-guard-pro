@@ -42,18 +42,30 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const CRON_SECRET = Deno.env.get("CRON_SECRET");
-  if (CRON_SECRET) {
-    const provided = req.headers.get("x-cron-secret");
-    if (provided !== CRON_SECRET) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+  if (!CRON_SECRET) {
+    console.error("CRON_SECRET is not set — refusing to run");
+    return new Response(JSON.stringify({ error: "Server misconfiguration" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const provided = req.headers.get("x-cron-secret");
+  if (provided !== CRON_SECRET) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SERVICE_KEY) {
+    console.error("Missing required env vars: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY");
+    return new Response(JSON.stringify({ error: "Server misconfiguration" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -152,7 +164,7 @@ Deno.serve(async (req) => {
         // Send stagiaire email
         if (resend && stagiaire?.email) {
           const certLabel = CERT_LABELS[cert.type] ?? cert.type;
-          const expiryFr = new Date(cert.date_expiration).toLocaleDateString("fr-FR");
+          const expiryFr = cert.date_expiration.split("-").reverse().join("/");
           const sessionsHtml = (sessions ?? []).length > 0
             ? `<ul>${(sessions ?? []).map((s: any) =>
                 `<li>${esc(s.title)} — ${new Date(s.start_date).toLocaleDateString("fr-FR")}${s.location ? ` — ${esc(s.location ?? "")}` : ""}</li>`
@@ -183,10 +195,11 @@ Deno.serve(async (req) => {
 
   // --- Process expired today ---
   const todayStr = today.toISOString().slice(0, 10);
-  const { data: expired } = await db
+  const { data: expired, error: expiredErr } = await db
     .from("certifications")
     .select("*, stagiaires(id, first_name, last_name, email)")
     .eq("date_expiration", todayStr);
+  if (expiredErr) { errors.push(`fetch expired: ${expiredErr.message}`); }
 
   for (const cert of (expired ?? [])) {
     try {
@@ -224,7 +237,7 @@ Deno.serve(async (req) => {
 
       if (resend && stagiaire?.email) {
         const certLabel = CERT_LABELS[cert.type] ?? cert.type;
-        const expiryFr = new Date(cert.date_expiration).toLocaleDateString("fr-FR");
+        const expiryFr = cert.date_expiration.split("-").reverse().join("/");
         await resend.emails.send({
           from: "SecureCRM <noreply@secureguardpro.fr>",
           to: stagiaire.email,
@@ -256,9 +269,9 @@ Deno.serve(async (req) => {
     for (const admin of (admins ?? [])) {
       if (!admin.email) continue;
       const rowsHtml = adminBatch.map(({ cert, stagiaire, threshold }) =>
-        `<tr><td>${stagiaire?.first_name ?? ""} ${stagiaire?.last_name ?? ""}</td>
-<td>${CERT_LABELS[cert.type] ?? cert.type}</td>
-<td>${new Date(cert.date_expiration).toLocaleDateString("fr-FR")}</td>
+        `<tr><td>${esc(stagiaire?.first_name ?? "")} ${esc(stagiaire?.last_name ?? "")}</td>
+<td>${esc(CERT_LABELS[cert.type] ?? cert.type)}</td>
+<td>${esc(cert.date_expiration.split("-").reverse().join("/"))}</td>
 <td>${threshold === 0 ? "Expiré" : `${threshold}j`}</td></tr>`
       ).join("");
 
