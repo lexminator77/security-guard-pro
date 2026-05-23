@@ -7,6 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const esc = (s: string) => s
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;");
+
 const RECYCLAGE_TYPE: Record<string, string> = {
   sst: "mac_sst", mac_sst: "mac_sst",
   ssiap1: "ssiap1", ssiap2: "ssiap2", ssiap3: "ssiap3",
@@ -34,6 +40,17 @@ async function getEntrepriseId(db: any, stagiaireId: string): Promise<string | n
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const CRON_SECRET = Deno.env.get("CRON_SECRET");
+  if (CRON_SECRET) {
+    const provided = req.headers.get("x-cron-secret");
+    if (provided !== CRON_SECRET) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -67,12 +84,13 @@ Deno.serve(async (req) => {
         const stagiaire = cert.stagiaires;
         const alerteType = `${days}j`;
 
-        // Idempotence: skip if notification already sent for this cert + threshold
+        // Idempotence: skip if notification already sent for this cert + threshold + stagiaire
         const { data: dup } = await db
           .from("notifications")
           .select("id")
           .eq("certification_id", cert.id)
           .eq("type_alerte", alerteType)
+          .eq("destinataire_type", "stagiaire")
           .maybeSingle();
         if (dup) { processed.push(`skip:${cert.id}:${alerteType}`); continue; }
 
@@ -100,27 +118,33 @@ Deno.serve(async (req) => {
           .order("start_date")
           .limit(3);
 
-        // Insert stagiaire notification
+        // Insert stagiaire notification (upsert for idempotence)
         const { data: stagNotif } = await db
           .from("notifications")
-          .insert({
-            destinataire_id: destinataireId,
-            destinataire_type: "stagiaire",
-            certification_id: cert.id,
-            type_alerte: alerteType,
-          })
+          .upsert(
+            {
+              destinataire_id: destinataireId,
+              destinataire_type: "stagiaire",
+              certification_id: cert.id,
+              type_alerte: alerteType,
+            },
+            { onConflict: "certification_id,type_alerte,destinataire_id" }
+          )
           .select("id")
           .single();
 
         // Insert entreprise notification if applicable (via junction table)
         const entrepriseId = await getEntrepriseId(db, cert.stagiaire_id);
         if (entrepriseId) {
-          await db.from("notifications").insert({
-            destinataire_id: entrepriseId,
-            destinataire_type: "entreprise",
-            certification_id: cert.id,
-            type_alerte: alerteType,
-          });
+          await db.from("notifications").upsert(
+            {
+              destinataire_id: entrepriseId,
+              destinataire_type: "entreprise",
+              certification_id: cert.id,
+              type_alerte: alerteType,
+            },
+            { onConflict: "certification_id,type_alerte,destinataire_id" }
+          );
         }
 
         adminBatch.push({ cert, stagiaire, threshold: days });
@@ -131,7 +155,7 @@ Deno.serve(async (req) => {
           const expiryFr = new Date(cert.date_expiration).toLocaleDateString("fr-FR");
           const sessionsHtml = (sessions ?? []).length > 0
             ? `<ul>${(sessions ?? []).map((s: any) =>
-                `<li>${s.title} — ${new Date(s.start_date).toLocaleDateString("fr-FR")}${s.location ? ` — ${s.location}` : ""}</li>`
+                `<li>${esc(s.title)} — ${new Date(s.start_date).toLocaleDateString("fr-FR")}${s.location ? ` — ${esc(s.location ?? "")}` : ""}</li>`
               ).join("")}</ul>`
             : "<p>Contactez votre formateur pour planifier un recyclage.</p>";
 
@@ -139,8 +163,8 @@ Deno.serve(async (req) => {
             from: "SecureCRM <noreply@secureguardpro.fr>",
             to: stagiaire.email,
             subject: `⚠️ Votre certification ${certLabel} expire dans ${days} jours`,
-            html: `<p>Bonjour ${stagiaire.first_name},</p>
-<p>Votre certification <strong>${certLabel}</strong> expire le <strong>${expiryFr}</strong> (dans ${days} jours).</p>
+            html: `<p>Bonjour ${esc(stagiaire.first_name)},</p>
+<p>Votre certification <strong>${esc(certLabel)}</strong> expire le <strong>${esc(expiryFr)}</strong> (dans ${days} jours).</p>
 <p><strong>Sessions de recyclage disponibles :</strong></p>${sessionsHtml}
 <p><a href="https://secureguardpro.fr/espace-stagiaire">Accéder à mon espace stagiaire</a></p>`,
           });
@@ -171,6 +195,7 @@ Deno.serve(async (req) => {
         .select("id")
         .eq("certification_id", cert.id)
         .eq("type_alerte", "expire")
+        .eq("destinataire_type", "stagiaire")
         .maybeSingle();
       if (dup) continue;
 
@@ -185,14 +210,32 @@ Deno.serve(async (req) => {
         if (profile?.id) destinataireId = profile.id;
       }
 
-      await db.from("notifications").insert({
-        destinataire_id: destinataireId,
-        destinataire_type: "stagiaire",
-        certification_id: cert.id,
-        type_alerte: "expire",
-      });
+      await db.from("notifications").upsert(
+        {
+          destinataire_id: destinataireId,
+          destinataire_type: "stagiaire",
+          certification_id: cert.id,
+          type_alerte: "expire",
+        },
+        { onConflict: "certification_id,type_alerte,destinataire_id" }
+      );
 
       adminBatch.push({ cert, stagiaire: cert.stagiaires, threshold: 0 });
+
+      if (resend && stagiaire?.email) {
+        const certLabel = CERT_LABELS[cert.type] ?? cert.type;
+        const expiryFr = new Date(cert.date_expiration).toLocaleDateString("fr-FR");
+        await resend.emails.send({
+          from: "SecureCRM <noreply@secureguardpro.fr>",
+          to: stagiaire.email,
+          subject: `⚠️ Votre certification ${esc(certLabel)} a expiré aujourd'hui`,
+          html: `<p>Bonjour ${esc(stagiaire.first_name)},</p>
+<p>Votre certification <strong>${esc(certLabel)}</strong> a expiré le <strong>${esc(expiryFr)}</strong>.</p>
+<p>Veuillez contacter votre formateur pour planifier un recyclage dès que possible.</p>
+<p><a href="https://secureguardpro.fr/espace-stagiaire">Accéder à mon espace stagiaire</a></p>`,
+        });
+      }
+
       processed.push(`expire:${cert.id}`);
     } catch (e: any) {
       errors.push(`expire ${cert.id}: ${e.message}`);
@@ -219,18 +262,22 @@ Deno.serve(async (req) => {
 <td>${threshold === 0 ? "Expiré" : `${threshold}j`}</td></tr>`
       ).join("");
 
-      await resend.emails.send({
-        from: "SecureCRM <noreply@secureguardpro.fr>",
-        to: admin.email,
-        subject: `Certifications — ${adminBatch.length} expirations dans les prochains jours`,
-        html: `<p>Bonjour,</p>
+      try {
+        await resend.emails.send({
+          from: "SecureCRM <noreply@secureguardpro.fr>",
+          to: admin.email,
+          subject: `Certifications — ${adminBatch.length} expirations dans les prochains jours`,
+          html: `<p>Bonjour,</p>
 <p>Récapitulatif des certifications à renouveler :</p>
 <table border="1" cellpadding="6" style="border-collapse:collapse">
 <thead><tr><th>Stagiaire</th><th>Certification</th><th>Expiration</th><th>Délai</th></tr></thead>
 <tbody>${rowsHtml}</tbody>
 </table>
 <p><a href="https://secureguardpro.fr/rappels">Voir les rappels</a></p>`,
-      });
+        });
+      } catch (e: any) {
+        errors.push(`admin email ${admin.email}: ${e.message}`);
+      }
     }
   }
 
