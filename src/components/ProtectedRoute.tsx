@@ -29,5 +29,10 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     return <Navigate to="/espace-stagiaire" replace />;
   }
 
+  // RH → espace RH uniquement
+  if (roles.includes("rh") && !roles.includes("administrateur") && !roles.includes("secretaire")) {
+    return <Navigate to="/espace-rh" replace />;
+  }
+
   return <>{children}</>;
 }
