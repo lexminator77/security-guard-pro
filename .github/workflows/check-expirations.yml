@@ -1,0 +1,17 @@
+name: Check certification expirations
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 6h UTC = 7h ou 8h heure française selon DST
+  workflow_dispatch:        # déclenchement manuel possible
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call check-expirations Edge Function
+        run: |
+          curl -sf -X POST \
+            "${{ secrets.SUPABASE_EDGE_FUNCTION_URL }}/check-expirations" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
