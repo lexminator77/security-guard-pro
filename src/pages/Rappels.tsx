@@ -1,15 +1,19 @@
 // @ts-nocheck
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AlertTriangle, Shield, UserCheck, Users, Search, ExternalLink, Bell } from "lucide-react";
 import {
   CERTS_FORMATEUR,
   alertLevel, badgeClass, formatDate, daysUntil, daysLabel, shouldAlertTfpAps
 } from "@/lib/certifications";
+import { CERT_LABELS, certStatusBadge, daysUntilExpiry } from "@/lib/certificationUtils";
+import type { CertType } from "@/types/certifications";
 
 interface AlertItem {
   type: "formateur" | "stagiaire";
@@ -22,14 +26,32 @@ interface AlertItem {
   carte_pro_number?: string | null;
 }
 
+interface CertRow {
+  id: string;
+  stagiaire_id: string;
+  type: CertType;
+  date_expiration: string;
+  stagiaires: { id: string; first_name: string; last_name: string; email: string } | null;
+}
+
 export default function Rappels() {
   const [items, setItems] = useState<AlertItem[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // Certifications stagiaires tab state
+  const [certs, setCerts] = useState<CertRow[]>([]);
+  const [certsLoading, setCertsLoading] = useState(true);
+  const [certsError, setCertsError] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterThreshold, setFilterThreshold] = useState<string>("all");
+
+  const navigate = useNavigate();
+
   useEffect(() => {
     document.title = "Rappels — SecureCRM";
     load();
+    loadCerts();
   }, []);
 
   const load = async () => {
@@ -109,6 +131,32 @@ export default function Rappels() {
     setLoading(false);
   };
 
+  const loadCerts = async () => {
+    setCertsLoading(true);
+    setCertsError(null);
+    const { data, error } = await supabase
+      .from("certifications")
+      .select("*, stagiaires(id, first_name, last_name, email)")
+      .order("date_expiration", { ascending: true });
+    if (error) {
+      setCertsError(error.message);
+    } else {
+      setCerts((data ?? []) as CertRow[]);
+    }
+    setCertsLoading(false);
+  };
+
+  const filteredCerts = certs.filter((cert) => {
+    if (filterType !== "all" && cert.type !== filterType) return false;
+    if (filterThreshold !== "all") {
+      const days = daysUntilExpiry(cert.date_expiration) ?? -1;
+      if (filterThreshold === "expired" && days >= 0) return false;
+      if (filterThreshold === "lt30" && days >= 30) return false;
+      if (filterThreshold === "lt90" && days >= 90) return false;
+    }
+    return true;
+  });
+
   const filtered = items.filter((it) => {
     const q = search.toLowerCase();
     return (
@@ -171,6 +219,7 @@ export default function Rappels() {
           <TabsTrigger value="bientot">Bientôt ({soon.length})</TabsTrigger>
           <TabsTrigger value="formateurs">Formateurs ({formateurs.length})</TabsTrigger>
           <TabsTrigger value="stagiaires">Stagiaires ({stagiaires.length})</TabsTrigger>
+          <TabsTrigger value="certifications">Certifications stagiaires</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tous" className="mt-4">
@@ -187,6 +236,96 @@ export default function Rappels() {
         </TabsContent>
         <TabsContent value="stagiaires" className="mt-4">
           <AlertList items={stagiaires} loading={loading} />
+        </TabsContent>
+
+        <TabsContent value="certifications" className="mt-4">
+          <div className="space-y-3">
+            {/* Filters */}
+            <div className="flex gap-3 flex-wrap">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-48 bg-secondary/50 border-border/50">
+                  <SelectValue placeholder="Tous les types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les types</SelectItem>
+                  {(Object.entries(CERT_LABELS) as [CertType, string][]).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterThreshold} onValueChange={setFilterThreshold}>
+                <SelectTrigger className="w-40 bg-secondary/50 border-border/50">
+                  <SelectValue placeholder="Tous" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  <SelectItem value="expired">Expiré</SelectItem>
+                  <SelectItem value="lt30">&lt; 30j</SelectItem>
+                  <SelectItem value="lt90">&lt; 90j</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Content */}
+            {certsLoading ? (
+              <div className="space-y-2">
+                <Card className="p-4 bg-card/60 border-border/50 animate-pulse h-16" />
+                <Card className="p-4 bg-card/60 border-border/50 animate-pulse h-16" />
+                <Card className="p-4 bg-card/60 border-border/50 animate-pulse h-16" />
+              </div>
+            ) : certsError ? (
+              <Card className="p-8 bg-card/60 border-border/50 text-center">
+                <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-2" />
+                <p className="text-destructive text-sm">{certsError}</p>
+              </Card>
+            ) : filteredCerts.length === 0 ? (
+              <Card className="p-8 bg-card/60 border-border/50 text-center">
+                <Bell className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground text-sm">Aucune certification dans cette catégorie</p>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {filteredCerts.map((cert) => {
+                  const badge = certStatusBadge(cert.date_expiration);
+                  const days = daysUntilExpiry(cert.date_expiration);
+                  const dateFormatted = cert.date_expiration.split("-").reverse().join("/");
+                  const stagiaireName = cert.stagiaires
+                    ? `${cert.stagiaires.first_name} ${cert.stagiaires.last_name}`
+                    : "—";
+                  return (
+                    <Card
+                      key={cert.id}
+                      onClick={() => navigate("/stagiaires")}
+                      className="p-4 bg-card/60 border-border/50 hover:border-primary/30 transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-secondary">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{stagiaireName}</p>
+                            <p className="text-xs text-muted-foreground">{CERT_LABELS[cert.type] ?? cert.type}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Expire le {dateFormatted}</p>
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {days === null ? "—" : days < 0 ? `${Math.abs(days)}j dépassé` : `${days}j restants`}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className={badge.className}>{badge.label}</Badge>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
