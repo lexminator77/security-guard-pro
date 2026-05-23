@@ -14,18 +14,28 @@ export default function ResetPassword() {
   const [pwd2, setPwd2] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [invalidLink, setInvalidLink] = useState(false);
 
   useEffect(() => {
     document.title = "Définir mot de passe — SecureCRM";
-    // Supabase pose la session via le hash (#access_token=...) à l'arrivée du lien d'invitation/recovery
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+
+    // Supabase émet INITIAL_SESSION même sans session — on ne l'utilise pas pour setReady
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") && session) {
         setReady(true);
       }
     });
+
+    // Session déjà active (ex : token hash traité avant le montage)
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
+      if (data.session) {
+        setReady(true);
+      } else {
+        // Aucune session après 3s → lien invalide ou déjà consommé
+        setTimeout(() => setInvalidLink(true), 3000);
+      }
     });
+
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -63,8 +73,13 @@ export default function ResetPassword() {
           </p>
         </div>
 
-        {!ready ? (
+        {!ready && !invalidLink ? (
           <p className="text-sm text-muted-foreground text-center">Vérification du lien…</p>
+        ) : !ready && invalidLink ? (
+          <div className="text-center space-y-2">
+            <p className="text-sm text-destructive font-medium">Lien invalide ou déjà utilisé.</p>
+            <p className="text-xs text-muted-foreground">Demande à l'administrateur de renvoyer une invitation.</p>
+          </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-2">
