@@ -70,6 +70,17 @@ Deno.serve(async (req) => {
     });
   }
 
+  const { data: entreprise, error: entErr } = await adminClient
+    .from("entreprises")
+    .select("id")
+    .eq("id", entreprise_id)
+    .maybeSingle();
+  if (entErr || !entreprise) {
+    return new Response(JSON.stringify({ error: "Company not found" }), {
+      status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(email);
   if (inviteErr) {
     return new Response(JSON.stringify({ error: inviteErr.message }), {
@@ -79,15 +90,25 @@ Deno.serve(async (req) => {
 
   const userId = inviteData.user.id;
 
-  await adminClient.from("user_roles").upsert(
+  const { error: roleErr } = await adminClient.from("user_roles").upsert(
     { user_id: userId, role: "rh" },
     { onConflict: "user_id,role" }
   );
+  if (roleErr) {
+    return new Response(JSON.stringify({ error: "Failed to assign role: " + roleErr.message }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-  await adminClient.from("entreprise_rh").upsert(
+  const { error: linkErr } = await adminClient.from("entreprise_rh").upsert(
     { user_id: userId, entreprise_id, email },
     { onConflict: "user_id" }
   );
+  if (linkErr) {
+    return new Response(JSON.stringify({ error: "Failed to link company: " + linkErr.message }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   return new Response(
     JSON.stringify({ ok: true, user_id: userId }),

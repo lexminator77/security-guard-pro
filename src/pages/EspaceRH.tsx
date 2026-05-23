@@ -83,7 +83,7 @@ export default function EspaceRH() {
       supabase.from("stagiaires").select("id, first_name, last_name").in("id", stagIds).order("last_name"),
       supabase.from("certifications").select("id, stagiaire_id, type, date_obtention, date_expiration, source").in("stagiaire_id", stagIds),
       supabase.from("formation_participants")
-        .select("stagiaire_id, formations(id, title, start_date, location)")
+        .select("stagiaire_id, formations!inner(id, title, start_date, location)")
         .in("stagiaire_id", stagIds)
         .gte("formations.start_date", today)
         .order("formations(start_date)"),
