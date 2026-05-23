@@ -60,7 +60,7 @@ const App = () => (
             </Route>
             <Route path="/espace-stagiaire" element={<EspaceStagiaire />} />
             <Route path="/espace-formateur" element={<EspaceFormateur />} />
-            <Route path="/espace-rh" element={<ProtectedRoute><EspaceRH /></ProtectedRoute>} />
+            <Route path="/espace-rh" element={<EspaceRH />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

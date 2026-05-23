@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
@@ -41,7 +42,7 @@ interface Document {
 }
 
 export default function EspaceRH() {
-  const { user, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [entrepriseName, setEntrepriseName] = useState("");
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -102,7 +103,7 @@ export default function EspaceRH() {
     setLoading(false);
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -112,6 +113,8 @@ export default function EspaceRH() {
       </div>
     );
   }
+
+  if (!user) return <Navigate to="/auth" replace />;
 
   return (
     <div className="min-h-screen bg-background">
