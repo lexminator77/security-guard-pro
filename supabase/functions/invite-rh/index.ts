@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
   );
 
   await adminClient.from("entreprise_rh").upsert(
-    { user_id: userId, entreprise_id },
+    { user_id: userId, entreprise_id, email },
     { onConflict: "user_id" }
   );
 

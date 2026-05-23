@@ -276,10 +276,10 @@ export default function Entreprises() {
   const loadRhAccount = async (entrepriseId: string) => {
     const { data } = await supabase
       .from("entreprise_rh")
-      .select("user_id")
+      .select("user_id, email")
       .eq("entreprise_id", entrepriseId)
       .maybeSingle();
-    setRhAccount(data ? { user_id: data.user_id, email: "Compte actif" } : null);
+    setRhAccount(data ? { user_id: data.user_id, email: data.email ?? "—" } : null);
   };
 
   const openRHDialog = async (e: Entreprise) => {
