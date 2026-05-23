@@ -81,7 +81,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(email);
+  const SITE_URL = Deno.env.get("SITE_URL") ?? "http://localhost:5173";
+  const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${SITE_URL}/reset-password`,
+  });
   if (inviteErr) {
     return new Response(JSON.stringify({ error: inviteErr.message }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
