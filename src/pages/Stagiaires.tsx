@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CertificationsTab } from "@/components/CertificationsTab";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Trash2, Users, Upload, FileText, Download, ArrowLeft, Eye, Archive, RotateCcw, Shield } from "lucide-react";
 import { toast } from "sonner";
@@ -58,6 +59,7 @@ export default function Stagiaires() {
   const [tab, setTab] = useState<"actif" | "archive">("actif");
   const [archiveNote, setArchiveNote] = useState("");
   const [archiveDialog, setArchiveDialog] = useState(false);
+  const [ficheTab, setFicheTab] = useState<"documents" | "certifications">("documents");
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     first_name: "", last_name: "", email: "", phone: "",
@@ -326,56 +328,69 @@ export default function Stagiaires() {
           )}
         </Card>
 
-        {/* DOCUMENTS */}
+        {/* TABS: DOCUMENTS / CERTIFICATIONS */}
         <Card className="p-6 bg-card/60 border-border/50">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" /> Documents
-            </h3>
-            {isAdmin && (
-              <div>
-                <input ref={fileRef} type="file" className="hidden"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={uploadDoc} />
-                <Button onClick={() => fileRef.current?.click()} disabled={uploading}
-                  className="gradient-primary text-primary-foreground" size="sm">
-                  <Upload className="h-4 w-4 mr-2" />
-                  {uploading ? "Upload..." : "Ajouter un document"}
-                </Button>
+          <Tabs value={ficheTab} onValueChange={(v) => setFicheTab(v as any)}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="certifications">Certifications</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="documents">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display font-semibold flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" /> Documents
+                </h3>
+                {isAdmin && (
+                  <div>
+                    <input ref={fileRef} type="file" className="hidden"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={uploadDoc} />
+                    <Button onClick={() => fileRef.current?.click()} disabled={uploading}
+                      className="gradient-primary text-primary-foreground" size="sm">
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploading ? "Upload..." : "Ajouter un document"}
+                    </Button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          {docs.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-sm border border-dashed border-border rounded-xl">
-              Aucun document pour ce stagiaire
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {docs.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">{doc.nom}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(doc.created_at).toLocaleDateString("fr-FR")}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button size="icon" variant="ghost" asChild>
-                      <a href={doc.url} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4" /></a>
-                    </Button>
-                    <Button size="icon" variant="ghost" asChild>
-                      <a href={doc.url} download={doc.nom}><Download className="h-4 w-4" /></a>
-                    </Button>
-                    {isAdmin && (
-                      <Button size="icon" variant="ghost" onClick={() => removeDoc(doc)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
+              {docs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm border border-dashed border-border rounded-xl">
+                  Aucun document pour ce stagiaire
                 </div>
-              ))}
-            </div>
-          )}
+              ) : (
+                <div className="space-y-2">
+                  {docs.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">{doc.nom}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(doc.created_at).toLocaleDateString("fr-FR")}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="icon" variant="ghost" asChild>
+                          <a href={doc.url} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4" /></a>
+                        </Button>
+                        <Button size="icon" variant="ghost" asChild>
+                          <a href={doc.url} download={doc.nom}><Download className="h-4 w-4" /></a>
+                        </Button>
+                        {isAdmin && (
+                          <Button size="icon" variant="ghost" onClick={() => removeDoc(doc)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="certifications">
+              <CertificationsTab stagiaireId={selected.id} />
+            </TabsContent>
+          </Tabs>
         </Card>
       </div>
     );
