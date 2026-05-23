@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default function AppLayout() {
   const { roles } = useAuth();
@@ -19,9 +20,12 @@ export default function AppLayout() {
               <div className="h-4 w-px bg-border" />
               <span className="text-sm text-muted-foreground hidden sm:inline">Centre de gestion</span>
             </div>
-            <Badge variant="outline" className="capitalize border-primary/40 text-primary">
-              {primaryRole}
-            </Badge>
+            <div className="flex items-center gap-3">
+              <NotificationBell />
+              <Badge variant="outline" className="capitalize border-primary/40 text-primary">
+                {primaryRole}
+              </Badge>
+            </div>
           </header>
           <main className="flex-1 p-4 sm:p-6 lg:p-8 animate-fade-in">
             <Outlet />
