@@ -6,6 +6,7 @@ import {
   certStatusBadge,
   daysUntilExpiry,
   calcDateExpiration,
+  formatDateFr,
 } from "../lib/certificationUtils";
 
 describe("CERT_LABELS", () => {
@@ -58,6 +59,14 @@ describe("certStatusBadge", () => {
     const far = new Date(); far.setDate(far.getDate() + 100);
     expect(certStatusBadge(far.toISOString().slice(0, 10)).status).toBe("valide");
   });
+  it("returns renouveler for exactly 30 days (boundary)", () => {
+    const d = new Date(); d.setDate(d.getDate() + 30);
+    expect(certStatusBadge(d.toISOString().slice(0, 10)).status).toBe("renouveler");
+  });
+  it("returns urgent for today (0 days)", () => {
+    const d = new Date();
+    expect(certStatusBadge(d.toISOString().slice(0, 10)).status).toBe("urgent");
+  });
 });
 
 describe("calcDateExpiration", () => {
@@ -69,5 +78,19 @@ describe("calcDateExpiration", () => {
   });
   it("adds 60 months for tfp_aps", () => {
     expect(calcDateExpiration("2026-05-01", "tfp_aps")).toBe("2031-05-01");
+  });
+});
+
+describe("formatDateFr", () => {
+  it("returns '—' for null", () => {
+    expect(formatDateFr(null)).toBe("—");
+  });
+  it("returns '—' for undefined", () => {
+    expect(formatDateFr(undefined)).toBe("—");
+  });
+  it("returns a non-empty string for a valid date", () => {
+    const result = formatDateFr("2026-05-23");
+    expect(result).toBeTruthy();
+    expect(result).not.toBe("—");
   });
 });
