@@ -201,10 +201,14 @@ Deno.serve(async (req) => {
 
   // --- Admin summary email (one per run) ---
   if (resend && adminBatch.length > 0) {
-    const { data: admins } = await db
-      .from("profiles")
-      .select("email")
+    const { data: adminRoles } = await db
+      .from("user_roles")
+      .select("user_id")
       .eq("role", "administrateur");
+    const adminIds = (adminRoles ?? []).map((r: any) => r.user_id);
+    const { data: admins } = adminIds.length > 0
+      ? await db.from("profiles").select("email").in("id", adminIds)
+      : { data: [] };
 
     for (const admin of (admins ?? [])) {
       if (!admin.email) continue;
