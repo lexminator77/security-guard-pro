@@ -26,6 +26,7 @@ import Audit from "./pages/Audit";
 import AdminCours from "./pages/AdminCours";
 import AdminMessages from "./pages/AdminMessages";
 import Rappels from "./pages/Rappels";
+import Reclamations from "./pages/Reclamations";
 import Entreprises from "./pages/Entreprises";
 import Documents from "./pages/Documents";
 import Statistiques from "./pages/Statistiques";
@@ -55,6 +56,7 @@ const App = () => (
               <Route path="/cours" element={<AdminCours />} />
               <Route path="/messagerie-admin" element={<AdminMessages />} />
               <Route path="/rappels" element={<Rappels />} />
+              <Route path="/reclamations" element={<Reclamations />} />
               <Route path="/entreprises" element={<Entreprises />} />
               <Route path="/documents" element={<Documents />} />
               <Route path="/statistiques" element={<Statistiques />} />

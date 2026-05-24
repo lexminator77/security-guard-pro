@@ -2,7 +2,7 @@
 import {
   LayoutDashboard, Users, GraduationCap, AlertTriangle,
   Calendar, FileText, BarChart3, Shield,
-  LogOut, UserCog, UserCheck, Award, ClipboardList, BookOpen, MessageSquare, Bell, Building2
+  LogOut, UserCog, UserCheck, Award, ClipboardList, BookOpen, MessageSquare, MessageSquareWarning, Bell, Building2
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -29,6 +29,7 @@ const allItems: { title: string; url: string; icon: any; roles: R[] }[] = [
   { title: "Cours", url: "/cours", icon: BookOpen, roles: ["administrateur"] },
   { title: "Messagerie", url: "/messagerie-admin", icon: MessageSquare, roles: ["administrateur"] },
   { title: "Rappels & Alertes", url: "/rappels", icon: Bell, roles: ["administrateur"] },
+  { title: "Réclamations", url: "/reclamations", icon: MessageSquareWarning, roles: ["administrateur", "secretaire"] },
 ];
 
 export function AppSidebar() {
