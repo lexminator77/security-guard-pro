@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import EspaceStagiaire from "./pages/EspaceStagiaire";
 import EspaceFormateur from "./pages/EspaceFormateur";
 import EspaceRH from "@/pages/EspaceRH";
+import QuestionnairePublic from "./pages/QuestionnairePublic";
 import Competences from "./pages/Competences";
 import Audit from "./pages/Audit";
 import AdminCours from "./pages/AdminCours";
@@ -61,6 +62,7 @@ const App = () => (
             <Route path="/espace-stagiaire" element={<EspaceStagiaire />} />
             <Route path="/espace-formateur" element={<EspaceFormateur />} />
             <Route path="/espace-rh" element={<EspaceRH />} />
+            <Route path="/q/:token" element={<QuestionnairePublic />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
