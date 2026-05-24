@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, GraduationCap, Trash2, Calendar, MapPin, Users, UserPlus, UserCheck, Euro, FileText, Download, CheckCircle2, XCircle, Clock, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { generateAttestation, generateEmargement, generateConvention } from "@/lib/generateDocs";
+import { QUESTIONNAIRE_LABELS } from "@/lib/questionnaireQuestions";
  
 const TYPES = ["APS", "SST", "SSIAP1", "SSIAP2", "SSIAP3", "MAC_APS", "H0B0", "AUTRE"];
 const PARTICIPANT_STATUSES = ["inscrit", "present", "absent", "valide", "echec"] as const;
@@ -80,6 +81,7 @@ export default function Formations() {
   const [form, setForm] = useState({
     title: "", type: "APS", description: "", start_date: "", end_date: "",
     location: "", max_participants: 12, formateur_id: "", showRemarque: false,
+    prix_ht: 0, duration_hours: 0,
   });
   const [manageOpen, setManageOpen] = useState(false);
   const [manageFormation, setManageFormation] = useState<any | null>(null);
@@ -88,7 +90,16 @@ export default function Formations() {
   const [editFormateurFormation, setEditFormateurFormation] = useState<any | null>(null);
   const [editFormateurId, setEditFormateurId] = useState<string>("");
   const [resultatComments, setResultatComments] = useState<Record<string, string>>({});
- 
+  const [qStats, setQStats] = useState<Record<string, Record<string, { sent: number; completed: number }>>>({});
+  const [qSendOpen, setQSendOpen] = useState(false);
+  const [qSendFormation, setQSendFormation] = useState<any | null>(null);
+  const [qSendType, setQSendType] = useState<"positionnement" | "satisfaction_chaud" | "satisfaction_froid">("positionnement");
+  const [qSendSelected, setQSendSelected] = useState<string[]>([]);
+  const [qSending, setQSending] = useState(false);
+  const [qResultsOpen, setQResultsOpen] = useState(false);
+  const [qResultsData, setQResultsData] = useState<any[]>([]);
+  const [qResultsType, setQResultsType] = useState<string>("");
+
   // --- NOUVEAU : état pour modifier les dates ---
   const [editDatesOpen, setEditDatesOpen] = useState(false);
   const [editDatesFormation, setEditDatesFormation] = useState<any | null>(null);
@@ -116,6 +127,23 @@ export default function Formations() {
     const comments: Record<string, string> = {};
     (p ?? []).forEach((row: any) => { comments[row.id] = row.resultat_commentaire ?? ""; });
     setResultatComments(comments);
+    if (f?.length) await loadQStats(f.map((x: any) => x.id));
+  };
+
+  const loadQStats = async (formationIds: string[]) => {
+    if (!formationIds.length) return;
+    const { data } = await supabase
+      .from("questionnaire_tokens")
+      .select("formation_id, type, completed_at")
+      .in("formation_id", formationIds);
+    const stats: Record<string, Record<string, { sent: number; completed: number }>> = {};
+    for (const row of (data ?? [])) {
+      stats[row.formation_id] ??= {};
+      stats[row.formation_id][row.type] ??= { sent: 0, completed: 0 };
+      stats[row.formation_id][row.type].sent++;
+      if (row.completed_at) stats[row.formation_id][row.type].completed++;
+    }
+    setQStats(stats);
   };
  
   const toggleStagiaire = (id: string, list: string[], setter: (v: string[]) => void) => {
@@ -130,6 +158,8 @@ export default function Formations() {
       title: form.title, type: form.type as any, description: form.description || null,
       start_date: form.start_date, end_date: form.end_date, location: form.location || null,
       max_participants: form.max_participants, created_by: user?.id,
+      prix_ht: form.prix_ht || 0,
+      duration_hours: form.duration_hours || 0,
     };
     if (form.formateur_id && form.formateur_id !== "") payload.formateur_id = form.formateur_id;
     const { data: created, error } = await supabase.from("formations").insert(payload).select().single();
@@ -141,7 +171,7 @@ export default function Formations() {
     }
     toast.success(`Formation créée${selectedStagiaires.length ? ` avec ${selectedStagiaires.length} stagiaire(s)` : ""}`);
     setOpen(false);
-    setForm({ title: "", type: "APS", description: "", start_date: "", end_date: "", location: "", max_participants: 12, formateur_id: "", showRemarque: false });
+    setForm({ title: "", type: "APS", description: "", start_date: "", end_date: "", location: "", max_participants: 12, formateur_id: "", showRemarque: false, prix_ht: 0, duration_hours: 0 });
     setSelectedStagiaires([]);
     load();
   };
@@ -187,6 +217,46 @@ export default function Formations() {
     load();
   };
  
+  const openQResults = async (formation: any, type: string) => {
+    const { data } = await supabase
+      .from("questionnaire_tokens")
+      .select("reponses, stagiaire_id, stagiaires(first_name, last_name)")
+      .eq("formation_id", formation.id)
+      .eq("type", type)
+      .not("completed_at", "is", null);
+    setQResultsData(data ?? []);
+    setQResultsType(type);
+    setQResultsOpen(true);
+  };
+
+  const sendQuestionnaire = async () => {
+    if (!qSendFormation) return;
+    setQSending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-questionnaire`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
+          "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          formation_id: qSendFormation.id,
+          stagiaire_ids: qSendSelected,
+          type: qSendType,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast.error(d.error || "Erreur"); return; }
+      toast.success(`${d.sent} email(s) envoyé(s)`);
+      setQSendOpen(false);
+      await loadQStats([qSendFormation.id]);
+    } finally {
+      setQSending(false);
+    }
+  };
+
   const saveEditFormateur = async () => {
     if (!editFormateurFormation) return;
     const payload: any = {};
@@ -409,6 +479,47 @@ export default function Formations() {
               ))}
             </div>
           )}
+          <div className="border-t border-border/30 pt-2 space-y-1.5">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Questionnaires Qualiopi</p>
+            {(["positionnement", "satisfaction_chaud", "satisfaction_froid"] as const).map((type) => {
+              const s = qStats[f.id]?.[type];
+              return (
+                <div key={type} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground truncate flex-1">{QUESTIONNAIRE_LABELS[type]}</span>
+                  {s ? (
+                    <span className={`text-[10px] ${s.completed === s.sent ? "text-emerald-400" : "text-yellow-400"}`}>
+                      {s.completed}/{s.sent}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground/50">—</span>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[10px] text-primary hover:bg-primary/10"
+                    onClick={() => {
+                      setQSendFormation(f);
+                      setQSendType(type);
+                      setQSendSelected((participantsByFormation[f.id] ?? []).map((p) => p.stagiaire_id));
+                      setQSendOpen(true);
+                    }}
+                  >
+                    Envoyer
+                  </Button>
+                  {s && s.completed >= 3 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                      onClick={() => openQResults(f, type)}
+                    >
+                      Résultats
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </Card>
     );
@@ -440,6 +551,16 @@ export default function Formations() {
                   </Select>
                 </div>
                 <div><Label>Places max</Label><Input type="number" value={form.max_participants} onChange={(e) => setForm({ ...form, max_participants: +e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Prix HT (€)</Label>
+                  <Input type="number" min="0" step="0.01" value={form.prix_ht} onChange={(e) => setForm({ ...form, prix_ht: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                  <Label>Durée (heures)</Label>
+                  <Input type="number" min="0" step="0.5" value={form.duration_hours} onChange={(e) => setForm({ ...form, duration_hours: parseFloat(e.target.value) || 0 })} />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Début *</Label><Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} required /></div>
@@ -585,6 +706,76 @@ export default function Formations() {
             <Button className="w-full gradient-primary text-primary-foreground" onClick={saveEditDates}>
               Enregistrer les dates
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog envoyer questionnaire */}
+      <Dialog open={qSendOpen} onOpenChange={setQSendOpen}>
+        <DialogContent className="bg-card border-border max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Envoyer — {qSendFormation?.title} · {QUESTIONNAIRE_LABELS[qSendType]}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Sélectionner les stagiaires à notifier :</p>
+            <ScrollArea className="h-48 rounded-md border border-border/60 p-2">
+              {(participantsByFormation[qSendFormation?.id] ?? []).map((p) => (
+                <label key={p.stagiaire_id} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/40 cursor-pointer">
+                  <Checkbox
+                    checked={qSendSelected.includes(p.stagiaire_id)}
+                    onCheckedChange={() =>
+                      setQSendSelected((prev) =>
+                        prev.includes(p.stagiaire_id)
+                          ? prev.filter((id) => id !== p.stagiaire_id)
+                          : [...prev, p.stagiaire_id]
+                      )
+                    }
+                  />
+                  <span className="text-sm">
+                    {p.stagiaire?.last_name?.toUpperCase()} {p.stagiaire?.first_name}
+                  </span>
+                  {!p.stagiaire?.email && (
+                    <span className="text-xs text-destructive ml-auto">pas d'email</span>
+                  )}
+                </label>
+              ))}
+            </ScrollArea>
+            <Button
+              onClick={sendQuestionnaire}
+              disabled={qSending || qSendSelected.length === 0}
+              className="w-full gradient-primary text-primary-foreground"
+            >
+              {qSending ? "Envoi…" : `Envoyer à ${qSendSelected.length} stagiaire(s)`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog résultats questionnaire */}
+      <Dialog open={qResultsOpen} onOpenChange={setQResultsOpen}>
+        <DialogContent className="bg-card border-border max-h-[80vh] overflow-y-auto max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Résultats — {QUESTIONNAIRE_LABELS[qResultsType]}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            {qResultsData.length === 0 ? (
+              <p className="text-muted-foreground">Aucune réponse enregistrée.</p>
+            ) : (
+              qResultsData.map((row: any, i: number) => (
+                <div key={i} className="border border-border/40 rounded-lg p-3 space-y-1">
+                  <p className="font-medium text-xs uppercase tracking-wider text-muted-foreground">
+                    {row.stagiaires?.last_name?.toUpperCase()} {row.stagiaires?.first_name}
+                  </p>
+                  {row.reponses && Object.entries(row.reponses as Record<string, unknown>).map(([k, v]) => (
+                    <p key={k} className="text-xs text-muted-foreground">
+                      <span className="font-mono text-primary/70">{k}</span> : {String(v ?? "—")}
+                    </p>
+                  ))}
+                </div>
+              ))
+            )}
           </div>
         </DialogContent>
       </Dialog>
