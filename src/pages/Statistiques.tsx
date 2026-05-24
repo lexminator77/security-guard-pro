@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-import { Users, GraduationCap, TrendingUp, Euro, Award, Calendar } from "lucide-react";
+import { Users, GraduationCap, TrendingUp, Euro, Award, Calendar, Download, FileSpreadsheet } from "lucide-react";
 
 const COLORS = ["hsl(var(--primary))", "#f97316", "#22c55e", "#a855f7", "#06b6d4", "#eab308", "#ef4444"];
 const MOIS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
@@ -18,6 +19,17 @@ export default function Statistiques() {
   const [formationsParType, setFormationsParType] = useState<any[]>([]);
   const [formationsParStatut, setFormationsParStatut] = useState<any[]>([]);
   const [revenusParMois, setRevenusParMois] = useState<any[]>([]);
+  const [bpfLoading, setBpfLoading] = useState(false);
+  const [bpfData, setBpfData] = useState<{
+    nbFormations: number;
+    nbStagiaires: number;
+    nbHeuresStagiaires: number;
+    chiffreAffaires: number;
+    nbFormateurs: number;
+    tauxSatisfaction: number | null;
+    tauxCompletionChaud: string;
+    tauxCompletionFroid: string;
+  } | null>(null);
 
   const annees = ["2024", "2025", "2026", "2027"];
 
@@ -107,6 +119,81 @@ export default function Statistiques() {
     setRevenusParMois(MOIS.map((name, i) => ({ name, value: revParMois[i] })));
 
     setLoading(false);
+  };
+
+  const loadBpf = async () => {
+    setBpfLoading(true);
+    const debut = `${annee}-01-01`;
+    const fin = `${annee}-12-31`;
+
+    const [{ data: formations }, { data: tokens }] = await Promise.all([
+      supabase.from("formations").select("id, formateur_id, prix_ht, duration_hours").gte("start_date", debut).lte("start_date", fin),
+      supabase.from("questionnaire_tokens").select("type, completed_at, reponses, formation_id"),
+    ]);
+
+    const fIds = (formations ?? []).map((f: any) => f.id);
+    const { data: participants } = fIds.length
+      ? await supabase.from("formation_participants").select("stagiaire_id, formation_id").in("formation_id", fIds)
+      : { data: [] };
+
+    const nbFormations = fIds.length;
+    const nbStagiaires = new Set((participants ?? []).map((p: any) => p.stagiaire_id)).size;
+
+    const participantsByFormation: Record<string, number> = {};
+    (participants ?? []).forEach((p: any) => {
+      participantsByFormation[p.formation_id] = (participantsByFormation[p.formation_id] ?? 0) + 1;
+    });
+    const nbHeuresStagiaires = (formations ?? []).reduce((acc: number, f: any) => {
+      return acc + (Number(f.duration_hours) || 0) * (participantsByFormation[f.id] ?? 0);
+    }, 0);
+
+    const chiffreAffaires = (formations ?? []).reduce((acc: number, f: any) => acc + (Number(f.prix_ht) || 0), 0);
+    const nbFormateurs = new Set((formations ?? []).filter((f: any) => f.formateur_id).map((f: any) => f.formateur_id)).size;
+
+    const anneeTokens = (tokens ?? []).filter((t: any) => fIds.includes(t.formation_id));
+    const chaudTokens = anneeTokens.filter((t: any) => t.type === "satisfaction_chaud");
+    const froidTokens = anneeTokens.filter((t: any) => t.type === "satisfaction_froid");
+
+    const scores: number[] = [];
+    chaudTokens.filter((t: any) => t.completed_at && t.reponses).forEach((t: any) => {
+      const rep = t.reponses as Record<string, unknown>;
+      ["sc1","sc2","sc3","sc4","sc5","sc6","sc7","sc8"].forEach((k) => {
+        const v = Number(rep[k]);
+        if (v >= 1 && v <= 5) scores.push(v);
+      });
+    });
+    const tauxSatisfaction = scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+
+    const chaudCompleted = chaudTokens.filter((t: any) => t.completed_at).length;
+    const froidCompleted = froidTokens.filter((t: any) => t.completed_at).length;
+    const tauxCompletionChaud = chaudTokens.length ? `${chaudCompleted}/${chaudTokens.length}` : "—";
+    const tauxCompletionFroid = froidTokens.length ? `${froidCompleted}/${froidTokens.length}` : "—";
+
+    setBpfData({ nbFormations, nbStagiaires, nbHeuresStagiaires, chiffreAffaires, nbFormateurs, tauxSatisfaction, tauxCompletionChaud, tauxCompletionFroid });
+    setBpfLoading(false);
+  };
+
+  const downloadBpfCsv = () => {
+    if (!bpfData) return;
+    const rows = [
+      ["Rubrique BPF", "Valeur", "Année"],
+      ["Nombre d'actions de formation", bpfData.nbFormations, annee],
+      ["Nombre de stagiaires formés", bpfData.nbStagiaires, annee],
+      ["Nombre d'heures stagiaires", bpfData.nbHeuresStagiaires, annee],
+      ["Chiffre d'affaires HT (€)", bpfData.chiffreAffaires, annee],
+      ["Nombre de formateurs actifs", bpfData.nbFormateurs, annee],
+      ["Taux de satisfaction moyen (/5)", bpfData.tauxSatisfaction ?? "N/A", annee],
+      ["Complétion satisfaction à chaud", bpfData.tauxCompletionChaud, annee],
+      ["Complétion satisfaction à froid", bpfData.tauxCompletionFroid, annee],
+    ];
+    const csv = rows.map((r) => r.map((v) => `"${v}"`).join(";")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `BPF_${annee}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const summaryCards = [
@@ -253,6 +340,46 @@ export default function Statistiques() {
           </div>
         </Card>
       </div>
+
+      <Card className="p-6 bg-card/60 border-border/50">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
+            <h2 className="font-display font-semibold">Export BPF — Bilan Pédagogique et Financier</h2>
+            <Badge variant="outline" className="ml-2 border-emerald-400/30 text-emerald-400">{annee}</Badge>
+          </div>
+          <Button size="sm" variant="outline" onClick={loadBpf} disabled={bpfLoading} className="border-border/50">
+            {bpfLoading ? "Chargement…" : "Calculer"}
+          </Button>
+        </div>
+
+        {!bpfData ? (
+          <p className="text-sm text-muted-foreground">Cliquez sur "Calculer" pour générer le bilan de l'année {annee}.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Actions de formation", value: bpfData.nbFormations },
+                { label: "Stagiaires formés", value: bpfData.nbStagiaires },
+                { label: "Heures stagiaires", value: bpfData.nbHeuresStagiaires },
+                { label: "CA HT (€)", value: bpfData.chiffreAffaires.toLocaleString("fr-FR") },
+                { label: "Formateurs actifs", value: bpfData.nbFormateurs },
+                { label: "Satisfaction moy. /5", value: bpfData.tauxSatisfaction ?? "N/A" },
+                { label: "Complétion chaud", value: bpfData.tauxCompletionChaud },
+                { label: "Complétion froid", value: bpfData.tauxCompletionFroid },
+              ].map((item) => (
+                <div key={item.label} className="bg-card/40 rounded-lg p-3 border border-border/40">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{item.label}</p>
+                  <p className="text-xl font-display font-bold text-primary mt-1">{item.value}</p>
+                </div>
+              ))}
+            </div>
+            <Button onClick={downloadBpfCsv} className="gradient-primary text-primary-foreground shadow-glow">
+              <Download className="h-4 w-4 mr-2" /> Télécharger BPF_{annee}.csv
+            </Button>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
