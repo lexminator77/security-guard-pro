@@ -112,12 +112,13 @@ Deno.serve(async (req) => {
 
     let tokenValue: string;
     if (existing) {
-      await adminClient.from("questionnaire_tokens").update({ sent_at: new Date().toISOString() }).eq("id", existing.id);
+      const { error: updateErr } = await adminClient.from("questionnaire_tokens").update({ sent_at: new Date().toISOString() }).eq("id", existing.id);
+      if (updateErr) { errors.push(`${stagiaire_id}: update failed`); continue; }
       tokenValue = existing.token;
     } else {
       const { data: created, error: insertErr } = await adminClient
         .from("questionnaire_tokens")
-        .insert({ formation_id, stagiaire_id, type })
+        .insert({ formation_id, stagiaire_id, type, sent_at: new Date().toISOString() })
         .select("token")
         .single();
       if (insertErr || !created) { errors.push(`${stagiaire_id}: insert failed`); continue; }
