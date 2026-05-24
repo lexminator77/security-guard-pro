@@ -100,6 +100,7 @@ export default function Reclamations() {
     const { error } = await supabase.from("reclamations").update({
       reponse: editReponse || null,
       statut: editStatut,
+      date_cloture: editStatut === "cloturee" ? (selected.date_cloture ?? new Date().toISOString().slice(0, 10)) : null,
     }).eq("id", selected.id);
     if (error) { toast.error(error.message); setSaving(false); return; }
     toast.success("Mise à jour enregistrée");
@@ -133,10 +134,10 @@ export default function Reclamations() {
           <h1 className="text-3xl font-display font-bold text-glow flex items-center gap-3">
             <MessageSquareWarning className="h-7 w-7 text-primary" /> Réclamations
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <div className="text-muted-foreground text-sm mt-1 flex items-center gap-2">
             {list.length} réclamation(s) au total
-            {openCount > 0 && <Badge className="ml-2 bg-destructive/10 text-destructive border-destructive/30">{openCount}</Badge>}
-          </p>
+            {openCount > 0 && <Badge className="bg-destructive/10 text-destructive border-destructive/30">{openCount}</Badge>}
+          </div>
         </div>
         <Button className="gradient-primary text-primary-foreground shadow-glow" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-2" /> Nouvelle réclamation
