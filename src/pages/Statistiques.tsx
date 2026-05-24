@@ -123,54 +123,58 @@ export default function Statistiques() {
 
   const loadBpf = async () => {
     setBpfLoading(true);
-    const debut = `${annee}-01-01`;
-    const fin = `${annee}-12-31`;
+    setBpfData(null);
+    try {
+      const debut = `${annee}-01-01`;
+      const fin = `${annee}-12-31`;
 
-    const [{ data: formations }, { data: tokens }] = await Promise.all([
-      supabase.from("formations").select("id, formateur_id, prix_ht, duration_hours").gte("start_date", debut).lte("start_date", fin),
-      supabase.from("questionnaire_tokens").select("type, completed_at, reponses, formation_id"),
-    ]);
+      const [{ data: formations }, { data: tokens }] = await Promise.all([
+        supabase.from("formations").select("id, formateur_id, prix_ht, duration_hours").gte("start_date", debut).lte("start_date", fin),
+        supabase.from("questionnaire_tokens").select("type, completed_at, reponses, formation_id"),
+      ]);
 
-    const fIds = (formations ?? []).map((f: any) => f.id);
-    const { data: participants } = fIds.length
-      ? await supabase.from("formation_participants").select("stagiaire_id, formation_id").in("formation_id", fIds)
-      : { data: [] };
+      const fIds = (formations ?? []).map((f: any) => f.id);
+      const { data: participants } = fIds.length
+        ? await supabase.from("formation_participants").select("stagiaire_id, formation_id").in("formation_id", fIds)
+        : { data: [] };
 
-    const nbFormations = fIds.length;
-    const nbStagiaires = new Set((participants ?? []).map((p: any) => p.stagiaire_id)).size;
+      const nbFormations = fIds.length;
+      const nbStagiaires = new Set((participants ?? []).map((p: any) => p.stagiaire_id)).size;
 
-    const participantsByFormation: Record<string, number> = {};
-    (participants ?? []).forEach((p: any) => {
-      participantsByFormation[p.formation_id] = (participantsByFormation[p.formation_id] ?? 0) + 1;
-    });
-    const nbHeuresStagiaires = (formations ?? []).reduce((acc: number, f: any) => {
-      return acc + (Number(f.duration_hours) || 0) * (participantsByFormation[f.id] ?? 0);
-    }, 0);
-
-    const chiffreAffaires = (formations ?? []).reduce((acc: number, f: any) => acc + (Number(f.prix_ht) || 0), 0);
-    const nbFormateurs = new Set((formations ?? []).filter((f: any) => f.formateur_id).map((f: any) => f.formateur_id)).size;
-
-    const anneeTokens = (tokens ?? []).filter((t: any) => fIds.includes(t.formation_id));
-    const chaudTokens = anneeTokens.filter((t: any) => t.type === "satisfaction_chaud");
-    const froidTokens = anneeTokens.filter((t: any) => t.type === "satisfaction_froid");
-
-    const scores: number[] = [];
-    chaudTokens.filter((t: any) => t.completed_at && t.reponses).forEach((t: any) => {
-      const rep = t.reponses as Record<string, unknown>;
-      ["sc1","sc2","sc3","sc4","sc5","sc6","sc7","sc8"].forEach((k) => {
-        const v = Number(rep[k]);
-        if (v >= 1 && v <= 5) scores.push(v);
+      const participantsByFormation: Record<string, number> = {};
+      (participants ?? []).forEach((p: any) => {
+        participantsByFormation[p.formation_id] = (participantsByFormation[p.formation_id] ?? 0) + 1;
       });
-    });
-    const tauxSatisfaction = scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+      const nbHeuresStagiaires = (formations ?? []).reduce((acc: number, f: any) => {
+        return acc + (Number(f.duration_hours) || 0) * (participantsByFormation[f.id] ?? 0);
+      }, 0);
 
-    const chaudCompleted = chaudTokens.filter((t: any) => t.completed_at).length;
-    const froidCompleted = froidTokens.filter((t: any) => t.completed_at).length;
-    const tauxCompletionChaud = chaudTokens.length ? `${chaudCompleted}/${chaudTokens.length}` : "—";
-    const tauxCompletionFroid = froidTokens.length ? `${froidCompleted}/${froidTokens.length}` : "—";
+      const chiffreAffaires = (formations ?? []).reduce((acc: number, f: any) => acc + (Number(f.prix_ht) || 0), 0);
+      const nbFormateurs = new Set((formations ?? []).filter((f: any) => f.formateur_id).map((f: any) => f.formateur_id)).size;
 
-    setBpfData({ nbFormations, nbStagiaires, nbHeuresStagiaires, chiffreAffaires, nbFormateurs, tauxSatisfaction, tauxCompletionChaud, tauxCompletionFroid });
-    setBpfLoading(false);
+      const anneeTokens = (tokens ?? []).filter((t: any) => fIds.includes(t.formation_id));
+      const chaudTokens = anneeTokens.filter((t: any) => t.type === "satisfaction_chaud");
+      const froidTokens = anneeTokens.filter((t: any) => t.type === "satisfaction_froid");
+
+      const scores: number[] = [];
+      chaudTokens.filter((t: any) => t.completed_at && t.reponses).forEach((t: any) => {
+        const rep = t.reponses as Record<string, unknown>;
+        ["sc1","sc2","sc3","sc4","sc5","sc6","sc7","sc8"].forEach((k) => {
+          const v = Number(rep[k]);
+          if (v >= 1 && v <= 5) scores.push(v);
+        });
+      });
+      const tauxSatisfaction = scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+
+      const chaudCompleted = chaudTokens.filter((t: any) => t.completed_at).length;
+      const froidCompleted = froidTokens.filter((t: any) => t.completed_at).length;
+      const tauxCompletionChaud = chaudTokens.length ? `${chaudCompleted}/${chaudTokens.length}` : "—";
+      const tauxCompletionFroid = froidTokens.length ? `${froidCompleted}/${froidTokens.length}` : "—";
+
+      setBpfData({ nbFormations, nbStagiaires, nbHeuresStagiaires, chiffreAffaires, nbFormateurs, tauxSatisfaction, tauxCompletionChaud, tauxCompletionFroid });
+    } finally {
+      setBpfLoading(false);
+    }
   };
 
   const downloadBpfCsv = () => {
@@ -193,7 +197,7 @@ export default function Statistiques() {
     a.href = url;
     a.download = `BPF_${annee}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const summaryCards = [
