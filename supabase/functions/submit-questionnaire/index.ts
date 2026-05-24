@@ -26,8 +26,8 @@ Deno.serve(async (req) => {
   }
 
   const { token, reponses } = body;
-  if (!token || !reponses) {
-    return new Response(JSON.stringify({ error: "token and reponses are required" }), {
+  if (typeof token !== "string" || typeof reponses !== "object" || reponses === null || Array.isArray(reponses)) {
+    return new Response(JSON.stringify({ error: "token must be a string and reponses must be an object" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
