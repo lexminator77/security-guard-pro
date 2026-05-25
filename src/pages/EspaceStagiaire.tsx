@@ -8,8 +8,10 @@ import {
   FileText, Download, Eye, Calendar, MapPin, BookOpen, Plus, Shield,
   ChevronDown, ChevronUp, Camera, CheckCircle, Clock,
   LayoutDashboard, GraduationCap, LogOut, User, Menu,
-  Award, X, PenLine, MessageSquare, Send
+  Award, X, PenLine, MessageSquare, Send, Settings
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { PageMainCourante, ConsignesStagiaire, PermisFeuStagiaire, StatistiquesStagiaire, RondierStagiaire } from "@/components/MainCourante";
 import { CERT_LABELS, RECYCLAGE_TYPE, certStatusBadge, daysUntilExpiry } from "@/lib/certificationUtils";
@@ -126,6 +128,7 @@ export default function EspaceStagiaire() {
 const [menuOpsOpen, setMenuOpsOpen] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [formationsLoaded, setFormationsLoaded] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const today = new Date().toISOString().slice(0, 10);
@@ -173,6 +176,7 @@ const [menuOpsOpen, setMenuOpsOpen] = useState(false);
 
     const formationsList = (f ?? []).map((fp: any) => fp.formation).filter(Boolean);
     setFormations(formationsList);
+    setFormationsLoaded(true);
 
     const types = [...new Set(formationsList.map((fm: any) => fm.type).filter(Boolean))];
     if (types.length > 0) {
@@ -273,6 +277,42 @@ setUnreadFromFormateur(nonLus);
   const formationsEnCours = formations.filter(f => f && f.start_date <= today && f.end_date >= today);
   const formationsAVenir = formations.filter(f => f && f.start_date > today);
   const formationsPassees = formations.filter(f => f && f.end_date < today);
+
+  const isActive = (f: any) => {
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const start = new Date(f.start_date); start.setHours(0, 0, 0, 0);
+    const end = new Date(f.end_date ?? f.start_date); end.setHours(0, 0, 0, 0);
+    end.setDate(end.getDate() + 15);
+    return t >= start && t <= end;
+  };
+  const formationsActives = formations.filter(isActive);
+  const nextFuture = formations.filter(f => new Date(f.start_date) > new Date()).sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+
+  const AccessGate = ({ type, date }: { type: "expired" | "future" | "none"; date?: string }) => (
+    <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
+      <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+        <Clock className="h-8 w-8 text-muted-foreground" />
+      </div>
+      {type === "future" && date && (
+        <>
+          <h2 className="text-xl font-display font-bold">Accès pas encore ouvert</h2>
+          <p className="text-muted-foreground text-sm max-w-xs">Votre espace ouvrira le {new Date(date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}.</p>
+        </>
+      )}
+      {type === "expired" && (
+        <>
+          <h2 className="text-xl font-display font-bold">Accès expiré</h2>
+          <p className="text-muted-foreground text-sm max-w-xs">Votre accès n'est plus valide. Contactez votre organisme de formation.</p>
+        </>
+      )}
+      {type === "none" && (
+        <>
+          <h2 className="text-xl font-display font-bold">Aucune formation associée</h2>
+          <p className="text-muted-foreground text-sm max-w-xs">Aucune formation n'est associée à votre compte. Contactez votre organisme de formation.</p>
+        </>
+      )}
+    </div>
+  );
 
   const navItems = [
     { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
@@ -733,6 +773,13 @@ setUnreadFromFormateur(nonLus);
   );
 
  const renderPage = () => {
+    if (page !== "parametres" && formationsLoaded) {
+      if (formations.length === 0) return <AccessGate type="none" />;
+      if (formationsActives.length === 0) {
+        if (nextFuture) return <AccessGate type="future" date={nextFuture.start_date} />;
+        return <AccessGate type="expired" />;
+      }
+    }
     switch (page) {
       case "dashboard": return <PageDashboard />;
       case "formations": return <PageFormations />;
