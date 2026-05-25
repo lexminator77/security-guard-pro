@@ -121,15 +121,14 @@ Deno.serve(async (req) => {
   });
 
   if (createErr) {
-    // Account may already exist in Auth but not linked — find and link it
-    const { data: { users } } = await adminClient.auth.admin.listUsers();
-    const existing = users.find((u) => u.email === stagiaire.email);
-    if (!existing) {
+    // Account may already exist in Auth but not linked — look it up by email
+    const { data: existingUser, error: lookupErr } = await adminClient.auth.admin.getUserByEmail(stagiaire.email);
+    if (!existingUser || lookupErr) {
       return new Response(JSON.stringify({ error: createErr.message }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    userId = existing.id;
+    userId = existingUser.user.id;
   } else {
     userId = created.user.id;
   }

@@ -283,19 +283,23 @@ export default function Formations() {
       );
       if (error) { toast.error(error.message); return; }
       const { data: { session } } = await supabase.auth.getSession();
-      await Promise.all(
-        toAdd.map((sid) =>
-          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-stagiaire-account`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${session?.access_token}`,
-              "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({ stagiaire_id: sid, formation_id: manageFormation.id }),
-          }).catch((e) => console.error("create-stagiaire-account failed:", e))
-        )
-      );
+      if (session) {
+        await Promise.all(
+          toAdd.map((sid) =>
+            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-stagiaire-account`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${session.access_token}`,
+                "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({ stagiaire_id: sid, formation_id: manageFormation.id }),
+            }).catch((e) => console.error("create-stagiaire-account failed:", e))
+          )
+        );
+      } else {
+        console.warn("No active session — skipping create-stagiaire-account calls");
+      }
     }
     if (toRemove.length) {
       const { error } = await supabase.from("formation_participants").delete().eq("formation_id", manageFormation.id).in("stagiaire_id", toRemove);
