@@ -27,5 +27,5 @@ ALTER TABLE public.questionnaire_tokens ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS qt_admin_all ON public.questionnaire_tokens;
 CREATE POLICY qt_admin_all ON public.questionnaire_tokens
   FOR ALL TO authenticated
-  USING (has_role(auth.uid(), 'administrateur') OR has_role(auth.uid(), 'secretaire'))
-  WITH CHECK (has_role(auth.uid(), 'administrateur') OR has_role(auth.uid(), 'secretaire'));
+  USING (public.has_role(auth.uid(), 'administrateur') OR public.has_role(auth.uid(), 'secretaire'))
+  WITH CHECK (public.has_role(auth.uid(), 'administrateur') OR public.has_role(auth.uid(), 'secretaire'));
