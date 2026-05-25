@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, GraduationCap, Trash2, Calendar, MapPin, Users, UserPlus, UserCheck, Euro, FileText, Download, CheckCircle2, XCircle, Clock, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { generateAttestation, generateEmargement, generateConvention } from "@/lib/generateDocs";
+import { generateAttestation, generateConvention } from "@/lib/generateDocs";
+import { generateEmargementPdf } from "@/lib/generateEmargementPdf";
 import { QUESTIONNAIRE_LABELS } from "@/lib/questionnaireQuestions";
  
 const TYPES = ["APS", "SST", "SSIAP1", "SSIAP2", "SSIAP3", "MAC_APS", "H0B0", "AUTRE"];
@@ -96,6 +97,7 @@ export default function Formations() {
   const [qSendType, setQSendType] = useState<"positionnement" | "satisfaction_chaud" | "satisfaction_froid">("positionnement");
   const [qSendSelected, setQSendSelected] = useState<string[]>([]);
   const [qSending, setQSending] = useState(false);
+  const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
   const [qResultsOpen, setQResultsOpen] = useState(false);
   const [qResultsData, setQResultsData] = useState<any[]>([]);
   const [qResultsType, setQResultsType] = useState<string>("");
@@ -478,9 +480,16 @@ export default function Formations() {
           {ps.length > 0 && (
             <div className="border-t border-border/30 pt-2 space-y-1.5">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Documents Qualiopi</p>
-              <Button size="sm" variant="outline" className="w-full border-yellow-400/30 text-yellow-400 hover:bg-yellow-400/10 text-xs"
-                onClick={() => generateEmargement(f, ps.map(p => p.stagiaire).filter(Boolean), formateurObj)}>
-                <FileText className="h-3.5 w-3.5 mr-1.5" /> Feuille d'émargement
+              <Button size="sm" variant="outline"
+                className="w-full border-yellow-400/30 text-yellow-400 hover:bg-yellow-400/10 text-xs"
+                disabled={loadingPdf === f.id}
+                onClick={async () => {
+                  setLoadingPdf(f.id);
+                  try { await generateEmargementPdf(f, supabase); }
+                  finally { setLoadingPdf(null); }
+                }}>
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                {loadingPdf === f.id ? "Génération…" : "Feuille d'émargement"}
               </Button>
               <Button size="sm" variant="outline" className="w-full border-yellow-400/30 text-yellow-400 hover:bg-yellow-400/10 text-xs"
                 onClick={() => generateConvention(f, ps.map(p => ({ ...p.stagiaire, tarif: p.tarif })).filter(Boolean), formateurObj)}>
