@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 const makeDate = (daysFromNow: number) => {
@@ -96,5 +96,17 @@ describe("EspaceStagiaire — fenêtre d'accès", () => {
     const { default: ES } = await import("@/pages/EspaceStagiaire");
     render(<MemoryRouter><ES /></MemoryRouter>);
     await waitFor(() => expect(screen.getByText(/aucune formation associée/i)).toBeInTheDocument());
+  });
+});
+
+describe("EspaceStagiaire — onglet Paramètres", () => {
+  it("affiche le formulaire de changement de mot de passe", async () => {
+    mockFormations = [mockFormation(-2, 5)];
+    const EspaceStagiaire = (await import("@/pages/EspaceStagiaire")).default;
+    render(<MemoryRouter><EspaceStagiaire /></MemoryRouter>);
+    await waitFor(() => screen.getByText(/tableau de bord/i));
+    const btn = screen.getByRole("button", { name: /paramètres/i });
+    fireEvent.click(btn);
+    await waitFor(() => expect(screen.getByText(/changer mon mot de passe/i)).toBeInTheDocument());
   });
 });

@@ -26,7 +26,7 @@ const STATUS_LABEL: Record<string, string> = {
   valide: "Validé", en_attente: "En attente", rejete: "Rejeté", archive: "Archivé",
 };
 
-type Page = "dashboard" | "formations" | "documents" | "cours" | "competences" | "emargement" | "profil" | "messagerie" | "maincourante_nouveau" | "maincourante_consulter" | "consignes" | "permisfeu" | "statistiques" | "rondier";
+type Page = "dashboard" | "formations" | "documents" | "cours" | "competences" | "emargement" | "profil" | "messagerie" | "maincourante_nouveau" | "maincourante_consulter" | "consignes" | "permisfeu" | "statistiques" | "rondier" | "parametres";
 function Messagerie({ messages, setMessages, stagiaireId }: {
   messages: any[];
   setMessages: (m: any[]) => void;
@@ -326,6 +326,7 @@ setUnreadFromFormateur(nonLus);
     { id: "maincourante_nouveau", label: "Nouveau", icon: Plus, parent: "maincourante", parentLabel: "Main courante" },
     { id: "maincourante_consulter", label: "Consulter", icon: Eye, parent: "maincourante", parentLabel: "Main courante" },
     { id: "profil", label: "Mon profil", icon: User },
+    { id: "parametres", label: "Paramètres", icon: Settings },
   ];
 
   const SidebarContent = () => (
@@ -772,6 +773,42 @@ setUnreadFromFormateur(nonLus);
     </div>
   );
 
+  const PageParametres = () => {
+    const [pwd1, setPwd1] = useState("");
+    const [pwd2, setPwd2] = useState("");
+    const [saving, setSaving] = useState(false);
+    const handleChange = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (pwd1.length < 8) { toast.error("8 caractères minimum"); return; }
+      if (pwd1 !== pwd2) { toast.error("Les mots de passe ne correspondent pas"); return; }
+      setSaving(true);
+      const { error } = await supabase.auth.updateUser({ password: pwd1 });
+      if (error) { toast.error(error.message); } else { toast.success("Mot de passe mis à jour"); setPwd1(""); setPwd2(""); }
+      setSaving(false);
+    };
+    return (
+      <div className="space-y-6 max-w-md">
+        <h1 className="text-2xl font-display font-bold">Paramètres</h1>
+        <Card className="p-6 bg-card/60 border-border/50">
+          <h2 className="font-semibold mb-4">Changer mon mot de passe</h2>
+          <form onSubmit={handleChange} className="space-y-4">
+            <div className="space-y-1">
+              <Label htmlFor="pwd1">Nouveau mot de passe</Label>
+              <Input id="pwd1" type="password" value={pwd1} onChange={(e) => setPwd1(e.target.value)} placeholder="8 caractères minimum" className="w-full min-h-[44px]" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="pwd2">Confirmer le mot de passe</Label>
+              <Input id="pwd2" type="password" value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="Répétez le mot de passe" className="w-full min-h-[44px]" />
+            </div>
+            <Button type="submit" disabled={saving} className="w-full gradient-primary text-primary-foreground min-h-[44px]">
+              {saving ? "Enregistrement…" : "Enregistrer"}
+            </Button>
+          </form>
+        </Card>
+      </div>
+    );
+  };
+
  const renderPage = () => {
     if (page !== "parametres" && formationsLoaded) {
       if (formations.length === 0) return <AccessGate type="none" />;
@@ -795,6 +832,7 @@ setUnreadFromFormateur(nonLus);
     case "maincourante_nouveau": return <PageMainCourante stagiaireId={stagiaireId!} formations={formations} vue="nouveau" />;
 case "maincourante_consulter": return <PageMainCourante stagiaireId={stagiaireId!} formations={formations} vue="consulter" />;
       case "profil": return <PageProfil />;
+      case "parametres": return <PageParametres />;
     }
   };
 
