@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { SignatureModal } from "@/components/SignatureModal";
 import { PageMainCourante, ConsignesStagiaire, PermisFeuStagiaire, StatistiquesStagiaire, RondierStagiaire } from "@/components/MainCourante";
 import { CERT_LABELS, RECYCLAGE_TYPE, certStatusBadge, daysUntilExpiry } from "@/lib/certificationUtils";
 import type { Certification } from "@/types/certifications";const STATUS_COLOR: Record<string, string> = {
@@ -126,6 +127,7 @@ export default function EspaceStagiaire() {
   const [openChapitre, setOpenChapitre] = useState<string | null>(null);
   const [menuMCOpen, setMenuMCOpen] = useState(false);
 const [menuOpsOpen, setMenuOpsOpen] = useState(false);
+  const [sigModal, setSigModal] = useState<{ formationId: string; periode: "matin" | "apres_midi" } | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
   const [formationsLoaded, setFormationsLoaded] = useState(false);
@@ -256,7 +258,7 @@ setUnreadFromFormateur(nonLus);
     }
   };
 
-  const signerEmargement = async (formationId: string, periode: "matin" | "apres_midi") => {
+  const signerEmargement = async (formationId: string, periode: "matin" | "apres_midi", signatureData: string) => {
     if (!stagiaireId) return;
     const exists = emargements.find(e => e.formation_id === formationId && e.date === today && e.periode === periode);
     if (exists) { toast.info("Déjà signé !"); return; }
@@ -266,6 +268,7 @@ setUnreadFromFormateur(nonLus);
       date: today,
       periode,
       signe_le: new Date().toISOString(),
+      signature_data: signatureData,
     });
     if (error) toast.error(error.message);
     else { toast.success("Émargement signé !"); loadAll(stagiaireId); }
@@ -602,8 +605,9 @@ setUnreadFromFormateur(nonLus);
           </div>
           <div className="grid grid-cols-2 gap-3">
             {(["matin", "apres_midi"] as const).map(periode => (
-              <button key={periode} onClick={() => signerEmargement(f.id, periode)}
-                className={`p-4 rounded-xl border-2 transition-all text-center ${estSigne(f.id, periode) ? "border-emerald-500 bg-emerald-500/10 text-emerald-400" : "border-border/50 bg-muted/20 hover:border-primary/40 hover:bg-primary/5"}`}>
+              <button key={periode}
+                onClick={() => !estSigne(f.id, periode) && setSigModal({ formationId: f.id, periode })}
+                className={`p-4 rounded-xl border-2 transition-all text-center ${estSigne(f.id, periode) ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 cursor-default" : "border-border/50 bg-muted/20 hover:border-primary/40 hover:bg-primary/5"}`}>
                 <p className="font-semibold text-sm">{estSigne(f.id, periode) ? "✓ Signé" : "Signer"}</p>
                 <p className="text-xs text-muted-foreground mt-1">{periode === "matin" ? "Matin" : "Après-midi"}</p>
               </button>
@@ -859,6 +863,15 @@ case "maincourante_consulter": return <PageMainCourante stagiaireId={stagiaireId
           <div className="max-w-3xl mx-auto">{renderPage()}</div>
         </main>
       </div>
+      <SignatureModal
+        open={!!sigModal}
+        title={`Signature — ${sigModal?.periode === "matin" ? "Matin" : "Après-midi"}`}
+        onConfirm={async (sig) => {
+          if (sigModal) await signerEmargement(sigModal.formationId, sigModal.periode, sig);
+          setSigModal(null);
+        }}
+        onClose={() => setSigModal(null)}
+      />
     </div>
   );
 }
