@@ -11,6 +11,7 @@ import {
   ChevronLeft, Send, Check, ChevronRight, Eye
 } from "lucide-react";
 import { toast } from "sonner";
+import { SignatureModal } from "@/components/SignatureModal";
 type Page = "dashboard" | "formations" | "emargement" | "certifications" | "profil" | "stagiaire" | "messagerie" | "maincourante" | "mcconfig" | "consignes" | "permisfeu" | "rondier";import { FileText } from "lucide-react";
 import { MainCouranteFormateur, MainCouranteConfig, ConsignesFormateur, PermisFeuFormateur, RondierFormateur } from "@/components/MainCourante";
 
@@ -107,6 +108,7 @@ export default function EspaceFormateur() {
   const [msgStagiaire, setMsgStagiaire] = useState<any>(null);
   const [menuOpsOpen, setMenuOpsOpen] = useState(false);
   const [msgFormation, setMsgFormation] = useState<any>(null);
+  const [sigModal, setSigModal] = useState<{ formationId: string; periode: "matin" | "apres_midi" } | null>(null);
 
   useEffect(() => { document.title = "Espace formateur — SecureCRM"; init(); }, []);
 
@@ -238,11 +240,18 @@ export default function EspaceFormateur() {
     finally { setUploadingPhoto(false); }
   };
 
-  const signerEmargement = async (formationId: string, periode: "matin" | "apres_midi") => {
+  const signerEmargement = async (formationId: string, periode: "matin" | "apres_midi", signatureData: string) => {
     if (!formateurId) return;
     const exists = emargements.find(e => e.formation_id === formationId && e.date === today && e.periode === periode);
     if (exists) { toast.info("Déjà signé !"); return; }
-    const { error } = await supabase.from("emargements_formateur").insert({ formateur_id: formateurId, formation_id: formationId, date: today, periode, signe_le: new Date().toISOString() });
+    const { error } = await supabase.from("emargements_formateur").insert({
+      formateur_id: formateurId,
+      formation_id: formationId,
+      date: today,
+      periode,
+      signe_le: new Date().toISOString(),
+      signature_data: signatureData,
+    });
     if (error) toast.error(error.message);
     else { toast.success("Émargement signé !"); loadAll(formateurId); }
   };
@@ -563,8 +572,9 @@ export default function EspaceFormateur() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             {(["matin", "apres_midi"] as const).map(periode => (
-              <button key={periode} onClick={() => signerEmargement(f.id, periode)}
-                className={`p-4 rounded-xl border-2 transition-all text-center ${estSigne(f.id, periode) ? "border-emerald-500 bg-emerald-500/10 text-emerald-400" : "border-border/50 bg-muted/20 hover:border-primary/40 hover:bg-primary/5"}`}>
+              <button key={periode}
+                onClick={() => !estSigne(f.id, periode) && setSigModal({ formationId: f.id, periode })}
+                className={`p-4 rounded-xl border-2 transition-all text-center ${estSigne(f.id, periode) ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 cursor-default" : "border-border/50 bg-muted/20 hover:border-primary/40 hover:bg-primary/5"}`}>
                 <p className="font-semibold text-sm">{estSigne(f.id, periode) ? "✓ Signé" : "Signer"}</p>
                 <p className="text-xs text-muted-foreground mt-1">{periode === "matin" ? "Matin" : "Après-midi"}</p>
               </button>
@@ -761,6 +771,15 @@ export default function EspaceFormateur() {
           <div className="max-w-3xl mx-auto">{renderPage()}</div>
         </main>
       </div>
+      <SignatureModal
+        open={!!sigModal}
+        title={`Signature — ${sigModal?.periode === "matin" ? "Matin" : "Après-midi"}`}
+        onConfirm={async (sig) => {
+          if (sigModal) await signerEmargement(sigModal.formationId, sigModal.periode, sig);
+          setSigModal(null);
+        }}
+        onClose={() => setSigModal(null)}
+      />
     </div>
   );
 }
