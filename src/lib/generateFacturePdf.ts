@@ -113,6 +113,11 @@ export function generateFacturePdf(
   });
   y = ((doc as any).lastAutoTable?.finalY ?? y + 20) + 8;
 
+  if (y > 240) {
+    doc.addPage();
+    y = 20;
+  }
+
   // Legal mentions
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
