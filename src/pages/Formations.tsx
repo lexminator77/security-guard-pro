@@ -485,8 +485,13 @@ export default function Formations() {
                 disabled={loadingPdf === f.id}
                 onClick={async () => {
                   setLoadingPdf(f.id);
-                  try { await generateEmargementPdf(f, supabase); }
-                  finally { setLoadingPdf(null); }
+                  try {
+                    await generateEmargementPdf(f, supabase);
+                  } catch (err: any) {
+                    toast.error(err?.message ?? "Erreur lors de la génération du PDF");
+                  } finally {
+                    setLoadingPdf(null);
+                  }
                 }}>
                 <FileText className="h-3.5 w-3.5 mr-1.5" />
                 {loadingPdf === f.id ? "Génération…" : "Feuille d'émargement"}
