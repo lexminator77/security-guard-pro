@@ -1,6 +1,6 @@
 // src/test/PasseportPrevention.test.tsx
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import PasseportPrevention from "@/pages/PasseportPrevention";
 
@@ -111,6 +111,9 @@ function renderPage() {
 }
 
 describe("PasseportPrevention", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => cleanup());
+
   it("affiche l'identité et les formations du stagiaire", async () => {
     renderPage();
     expect(await screen.findByText(/DUPONT/)).toBeInTheDocument();

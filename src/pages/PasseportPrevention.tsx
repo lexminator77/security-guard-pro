@@ -76,17 +76,20 @@ export default function PasseportPrevention() {
   const [effectiveId, setEffectiveId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !roles) return;
+    let cancelled = false;
     const isStagiaire = (roles as string[]).includes("stagiaire");
     if (isStagiaire) {
       supabase.from("stagiaires").select("id").eq("auth_user_id", user.id).single()
         .then(({ data }) => {
+          if (cancelled) return;
           if (data) setEffectiveId(data.id);
           else setLoading(false);
         });
     } else {
       setEffectiveId(paramId ?? null);
     }
+    return () => { cancelled = true; };
   }, [user, roles, paramId]);
 
   useEffect(() => {
@@ -154,12 +157,12 @@ export default function PasseportPrevention() {
       </div>
 
       <div className="border border-border/50 rounded-lg p-4 bg-card/50 space-y-1">
-        <h2 className="text-lg font-bold">{stagiaire.last_name.toUpperCase()} {stagiaire.first_name}</h2>
+        <h2 className="text-lg font-bold">{(stagiaire.last_name ?? "").toUpperCase()} {stagiaire.first_name}</h2>
         {stagiaire.birth_date && (
           <p className="text-sm text-muted-foreground">Né(e) le {fmtDate(stagiaire.birth_date)}</p>
         )}
         <p className="text-sm text-muted-foreground">
-          {stagiaire.email}{stagiaire.phone ? ` · ${stagiaire.phone}` : ""}
+          {stagiaire.email ?? ""}{stagiaire.phone ? ` · ${stagiaire.phone}` : ""}
         </p>
         <div className="pt-1 text-sm">
           <span className="font-medium">Carte pro CNAPS : </span>
@@ -239,7 +242,7 @@ export default function PasseportPrevention() {
               <tbody>
                 {certifications.map((c, i) => (
                   <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-muted/10">
-                    <td className="p-3 font-medium text-xs">{c.type.toUpperCase()}</td>
+                    <td className="p-3 font-medium text-xs">{(c.type ?? "").toUpperCase()}</td>
                     <td className="p-3 text-muted-foreground text-xs">{fmtDate(c.date_obtention)}</td>
                     <td className="p-3 text-muted-foreground text-xs">{fmtDate(c.date_expiration)}</td>
                     <td className="p-3 text-muted-foreground text-xs">{c.formation?.title ?? "—"}</td>
