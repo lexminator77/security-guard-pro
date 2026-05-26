@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, GraduationCap, Trash2, Calendar, MapPin, Users, UserPlus, UserCheck, Euro, FileText, Download, CheckCircle2, XCircle, Clock, Pencil, Receipt } from "lucide-react";
+import { Plus, GraduationCap, Trash2, Calendar, MapPin, Users, UserPlus, UserCheck, Euro, FileText, Download, CheckCircle2, XCircle, Clock, Pencil, Receipt, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { generateAttestation } from "@/lib/generateDocs";
 import { generateConventionPdf } from "@/lib/generateConventionPdf";
@@ -43,6 +43,16 @@ const RESULTAT_CONFIG = {
   en_attente: { label: "En attente", icon: Clock, color: "text-muted-foreground", bg: "bg-muted/30 border-border/50" },
 };
  
+const OPCO_SC: Record<string, { label: string; next: string | null }> = {
+  brouillon:          { label: "Brouillon",          next: "demande_envoyee" },
+  demande_envoyee:    { label: "Demande envoyée",    next: "accord_recu" },
+  accord_recu:        { label: "Accord reçu",        next: "en_attente_facture" },
+  en_attente_facture: { label: "En attente facture", next: "facture" },
+  facture:            { label: "Facturé",             next: "paye" },
+  paye:               { label: "Payé",                next: null },
+  refuse:             { label: "Refusé",              next: null },
+};
+
 const getBusyStagiaireIds = (
   formations: any[],
   participantsByFormation: Record<string, Participant[]>,
@@ -117,9 +127,42 @@ export default function Formations() {
   const [editDatesFormation, setEditDatesFormation] = useState<any | null>(null);
   const [editDatesStart, setEditDatesStart] = useState("");
   const [editDatesEnd, setEditDatesEnd] = useState("");
- 
+
+  const [opcoModal, setOpcoModal] = useState<{ formation: any; participants: any[] } | null>(null);
+  const [opcoDossiers, setOpcoDossiers] = useState<any[]>([]);
+  const [opcoFormOpen, setOpcoFormOpen] = useState(false);
+  const [opcoForm, setOpcoForm] = useState({
+    perimetre: "formation" as "formation" | "stagiaire",
+    stagiaire_id: "",
+    opco_nom: "",
+    opco_contact_nom: "",
+    opco_contact_email: "",
+    opco_contact_tel: "",
+    numero_dossier: "",
+    montant_accorde: 0,
+    notes: "",
+  });
+  const [savingOpco, setSavingOpco] = useState(false);
+  const [opcoReloadKey, setOpcoReloadKey] = useState(0);
+
   useEffect(() => { document.title = "Formations — SecureCRM"; load(); }, []);
- 
+
+  useEffect(() => {
+    if (!opcoModal) { setOpcoDossiers([]); return; }
+    let cancelled = false;
+    supabase
+      .from("financements_opco")
+      .select("*, stagiaire:stagiaires(first_name, last_name)")
+      .eq("formation_id", opcoModal.formation.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) toast.error(error.message);
+        else setOpcoDossiers(data ?? []);
+      });
+    return () => { cancelled = true; };
+  }, [opcoModal?.formation?.id, opcoReloadKey]);
+
   const load = async () => {
     const [{ data: f }, { data: s }, { data: p }, { data: fo }] = await Promise.all([
       supabase.from("formations").select("*").order("start_date", { ascending: false }),
@@ -388,6 +431,46 @@ export default function Formations() {
     }
   };
 
+  const saveOpcoDossier = async () => {
+    if (!opcoModal || !opcoForm.opco_nom.trim()) return;
+    setSavingOpco(true);
+    try {
+      const { error } = await supabase.from("financements_opco").insert({
+        formation_id: opcoModal.formation.id,
+        stagiaire_id: opcoForm.perimetre === "stagiaire" ? opcoForm.stagiaire_id || null : null,
+        opco_nom: opcoForm.opco_nom.trim(),
+        opco_contact_nom: opcoForm.opco_contact_nom.trim() || null,
+        opco_contact_email: opcoForm.opco_contact_email.trim() || null,
+        opco_contact_tel: opcoForm.opco_contact_tel.trim() || null,
+        numero_dossier: opcoForm.numero_dossier.trim() || null,
+        montant_accorde: opcoForm.montant_accorde,
+        notes: opcoForm.notes.trim() || null,
+      });
+      if (error) throw new Error(error.message);
+      toast.success("Dossier OPCO créé");
+      setOpcoFormOpen(false);
+      setOpcoForm({ perimetre: "formation", stagiaire_id: "", opco_nom: "", opco_contact_nom: "", opco_contact_email: "", opco_contact_tel: "", numero_dossier: "", montant_accorde: 0, notes: "" });
+      setOpcoReloadKey(k => k + 1);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erreur");
+    } finally {
+      setSavingOpco(false);
+    }
+  };
+
+  const updateOpcoStatut = async (id: string, statut: string) => {
+    const { error } = await supabase.from("financements_opco").update({ statut }).eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Statut mis à jour"); setOpcoReloadKey(k => k + 1); }
+  };
+
+  const deleteOpcoDossier = async (id: string) => {
+    if (!confirm("Supprimer ce dossier OPCO ?")) return;
+    const { error } = await supabase.from("financements_opco").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Dossier supprimé"); setOpcoReloadKey(k => k + 1); }
+  };
+
   const getFormateurName = (formateurId: string | null) => {
     if (!formateurId) return null;
     const f = formateurs.find(f => f.id === formateurId);
@@ -578,6 +661,15 @@ export default function Formations() {
                   setFactureModal({ formation: f, participants: ps });
                 }}>
                 <Receipt className="h-3.5 w-3.5 mr-1.5" /> Créer la facture
+              </Button>
+              <Button size="sm" variant="outline"
+                className="w-full border-amber-400/30 text-amber-400 hover:bg-amber-400/10 text-xs"
+                onClick={() => {
+                  setOpcoFormOpen(false);
+                  setOpcoForm({ perimetre: "formation", stagiaire_id: "", opco_nom: "", opco_contact_nom: "", opco_contact_email: "", opco_contact_tel: "", numero_dossier: "", montant_accorde: 0, notes: "" });
+                  setOpcoModal({ formation: f, participants: ps });
+                }}>
+                <Landmark className="h-3.5 w-3.5 mr-1.5" /> Dossiers OPCO
               </Button>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider pt-1">Attestations individuelles</p>
               {ps.filter(p => p.stagiaire).map((p: any) => (
@@ -1016,6 +1108,176 @@ export default function Formations() {
               >
                 {creatingFacture ? "Création…" : "Créer et télécharger"}
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+      {opcoModal && (
+        <Dialog open={!!opcoModal} onOpenChange={(v) => !v && setOpcoModal(null)}>
+          <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                <span className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4 text-amber-400" />
+                  Dossiers OPCO — {opcoModal.formation.title}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              {opcoDossiers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucun dossier OPCO pour cette formation.</p>
+              ) : (
+                <div className="space-y-2">
+                  {opcoDossiers.map((d: any) => {
+                    const cfg = OPCO_SC[d.statut] ?? OPCO_SC.brouillon;
+                    const perimetre = d.stagiaire
+                      ? `${d.stagiaire.last_name} ${d.stagiaire.first_name}`
+                      : "Formation entière";
+                    return (
+                      <div key={d.id} className="border border-border/50 rounded p-3 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm">{d.opco_nom}</span>
+                          {d.numero_dossier && (
+                            <span className="text-xs text-muted-foreground font-mono">#{d.numero_dossier}</span>
+                          )}
+                          <Badge variant="outline" className="text-xs">{cfg.label}</Badge>
+                          <span className="text-xs text-muted-foreground ml-auto">{perimetre}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Accordé : {Number(d.montant_accorde).toLocaleString("fr-FR")} €
+                          {" · "}Payé : {Number(d.montant_paye).toLocaleString("fr-FR")} €
+                        </p>
+                        <div className="flex gap-2 flex-wrap">
+                          {cfg.next && (
+                            <Button size="sm" variant="outline" className="h-7 text-xs"
+                              onClick={() => updateOpcoStatut(d.id, cfg.next)}>
+                              → {OPCO_SC[cfg.next]?.label}
+                            </Button>
+                          )}
+                          {d.statut !== "paye" && d.statut !== "refuse" && (
+                            <Button size="sm" variant="outline"
+                              className="h-7 text-xs text-red-400 border-red-400/30 hover:bg-red-400/10"
+                              onClick={() => updateOpcoStatut(d.id, "refuse")}>
+                              Refuser
+                            </Button>
+                          )}
+                          {d.statut === "brouillon" && (
+                            <Button size="sm" variant="outline"
+                              className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 ml-auto"
+                              onClick={() => deleteOpcoDossier(d.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <Button size="sm" variant="outline" className="w-full"
+                onClick={() => setOpcoFormOpen(v => !v)}>
+                {opcoFormOpen ? "Annuler" : "+ Nouveau dossier OPCO"}
+              </Button>
+
+              {opcoFormOpen && (
+                <div className="space-y-3 border border-border/50 rounded-lg p-3">
+                  <div>
+                    <Label className="text-sm font-medium">Périmètre</Label>
+                    <div className="flex gap-4 mt-1">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input type="radio" name="opco-perimetre" value="formation"
+                          checked={opcoForm.perimetre === "formation"}
+                          onChange={() => setOpcoForm(f => ({ ...f, perimetre: "formation", stagiaire_id: "" }))} />
+                        Formation entière
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input type="radio" name="opco-perimetre" value="stagiaire"
+                          checked={opcoForm.perimetre === "stagiaire"}
+                          onChange={() => setOpcoForm(f => ({ ...f, perimetre: "stagiaire" }))} />
+                        Stagiaire spécifique
+                      </label>
+                    </div>
+                  </div>
+
+                  {opcoForm.perimetre === "stagiaire" && (
+                    <div>
+                      <Label className="text-sm font-medium">Stagiaire *</Label>
+                      <select className="mt-1 w-full border border-border rounded px-2 py-1.5 text-sm bg-background"
+                        value={opcoForm.stagiaire_id}
+                        onChange={e => setOpcoForm(f => ({ ...f, stagiaire_id: e.target.value }))}>
+                        <option value="">Sélectionner…</option>
+                        {opcoModal.participants.filter((p: any) => p.stagiaire).map((p: any) => (
+                          <option key={p.stagiaire.id} value={p.stagiaire.id}>
+                            {p.stagiaire.last_name} {p.stagiaire.first_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <Label className="text-sm font-medium">OPCO — Nom *</Label>
+                    <Input className="mt-1" placeholder="AFDAS, OPCO EP, Constructys…"
+                      value={opcoForm.opco_nom}
+                      onChange={e => setOpcoForm(f => ({ ...f, opco_nom: e.target.value }))} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-sm font-medium">Contact gestionnaire</Label>
+                      <Input className="mt-1" placeholder="Nom Prénom"
+                        value={opcoForm.opco_contact_nom}
+                        onChange={e => setOpcoForm(f => ({ ...f, opco_contact_nom: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Email gestionnaire</Label>
+                      <Input className="mt-1" type="email" placeholder="gestionnaire@opco.fr"
+                        value={opcoForm.opco_contact_email}
+                        onChange={e => setOpcoForm(f => ({ ...f, opco_contact_email: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-sm font-medium">Téléphone gestionnaire</Label>
+                      <Input className="mt-1" placeholder="0600000000"
+                        value={opcoForm.opco_contact_tel}
+                        onChange={e => setOpcoForm(f => ({ ...f, opco_contact_tel: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">N° dossier OPCO</Label>
+                      <Input className="mt-1" placeholder="Réf. OPCO"
+                        value={opcoForm.numero_dossier}
+                        onChange={e => setOpcoForm(f => ({ ...f, numero_dossier: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium">Montant accordé (€)</Label>
+                    <Input className="mt-1" type="number" min={0} step={0.01}
+                      value={opcoForm.montant_accorde}
+                      onChange={e => setOpcoForm(f => ({ ...f, montant_accorde: Number(e.target.value) }))} />
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium">Notes</Label>
+                    <Textarea className="mt-1" rows={2} placeholder="Remarques…"
+                      value={opcoForm.notes}
+                      onChange={e => setOpcoForm(f => ({ ...f, notes: e.target.value }))} />
+                  </div>
+
+                  <Button className="w-full"
+                    disabled={
+                      !opcoForm.opco_nom.trim() ||
+                      savingOpco ||
+                      (opcoForm.perimetre === "stagiaire" && !opcoForm.stagiaire_id)
+                    }
+                    onClick={saveOpcoDossier}>
+                    {savingOpco ? "Création…" : "Créer le dossier"}
+                  </Button>
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
