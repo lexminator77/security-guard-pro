@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, GraduationCap, Trash2, Calendar, MapPin, Users, UserPlus, UserCheck, Euro, FileText, Download, CheckCircle2, XCircle, Clock, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { generateAttestation, generateConvention } from "@/lib/generateDocs";
+import { generateAttestation } from "@/lib/generateDocs";
+import { generateConventionPdf } from "@/lib/generateConventionPdf";
 import { generateEmargementPdf } from "@/lib/generateEmargementPdf";
 import { QUESTIONNAIRE_LABELS } from "@/lib/questionnaireQuestions";
  
@@ -98,6 +99,7 @@ export default function Formations() {
   const [qSendSelected, setQSendSelected] = useState<string[]>([]);
   const [qSending, setQSending] = useState(false);
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
+  const [loadingConvention, setLoadingConvention] = useState<string | null>(null);
   const [qResultsOpen, setQResultsOpen] = useState(false);
   const [qResultsData, setQResultsData] = useState<any[]>([]);
   const [qResultsType, setQResultsType] = useState<string>("");
@@ -496,9 +498,26 @@ export default function Formations() {
                 <FileText className="h-3.5 w-3.5 mr-1.5" />
                 {loadingPdf === f.id ? "Génération…" : "Feuille d'émargement"}
               </Button>
-              <Button size="sm" variant="outline" className="w-full border-yellow-400/30 text-yellow-400 hover:bg-yellow-400/10 text-xs"
-                onClick={() => generateConvention(f, ps.map(p => ({ ...p.stagiaire, tarif: p.tarif })).filter(Boolean), formateurObj)}>
-                <FileText className="h-3.5 w-3.5 mr-1.5" /> Convention de formation
+              <Button size="sm" variant="outline"
+                className="w-full border-yellow-400/30 text-yellow-400 hover:bg-yellow-400/10 text-xs"
+                disabled={loadingConvention === f.id}
+                onClick={async () => {
+                  setLoadingConvention(f.id);
+                  try {
+                    await generateConventionPdf(
+                      f,
+                      ps.map(p => ({ ...p.stagiaire, tarif: p.tarif })).filter(Boolean),
+                      formateurObj ?? null,
+                      supabase
+                    );
+                  } catch (err: any) {
+                    toast.error(err?.message ?? "Erreur lors de la génération de la convention");
+                  } finally {
+                    setLoadingConvention(null);
+                  }
+                }}>
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                {loadingConvention === f.id ? "Génération…" : "Convention de formation"}
               </Button>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider pt-1">Attestations individuelles</p>
               {ps.map(p => p.stagiaire).filter(Boolean).map((s: any) => (
