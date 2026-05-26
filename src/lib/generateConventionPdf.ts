@@ -31,6 +31,7 @@ function sectionTitle(doc: jsPDF, text: string, y: number): number {
 }
 
 function labelValue(doc: jsPDF, label: string, value: string, y: number): number {
+  if (y > 270) { doc.addPage(); y = 20; }
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   doc.text(label + " :", 18, y);
@@ -45,9 +46,10 @@ export async function generateConventionPdf(
   formateur: { first_name: string; last_name: string } | null,
   supabase: SupabaseClient
 ): Promise<void> {
-  const { data: entreprises } = await supabase
+  const { data: entreprises, error: rhError } = await supabase
     .from("entreprise_rh")
     .select("nom, contact_nom, contact_prenom, adresse, code_postal, ville, email, telephone, siret");
+  if (rhError) throw new Error(rhError.message);
   const e = entreprises?.length === 1 ? entreprises[0] : null;
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -98,7 +100,7 @@ export async function generateConventionPdf(
     headStyles: { fillColor: [44, 44, 44], textColor: [212, 175, 55], fontStyle: "bold" },
     margin: { left: 15, right: 15 },
   });
-  y = (doc as any).lastAutoTable.finalY + 4;
+  y = ((doc as any).lastAutoTable?.finalY ?? y + 20) + 4;
   separator(doc, y); y += 4;
 
   const totalHt = participants.reduce((acc, p) => acc + (Number(p.tarif) || 0), 0);

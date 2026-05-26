@@ -64,4 +64,15 @@ describe("generateConventionPdf", () => {
     await generateConventionPdf(formation, participants, null, buildMock([]) as any);
     expect(mockSave).toHaveBeenCalled();
   });
+
+  it("lance une erreur si Supabase échoue", async () => {
+    const failMock = {
+      from: () => ({
+        select: () => Promise.resolve({ data: null, error: { message: "DB error" } }),
+      }),
+    };
+    await expect(
+      generateConventionPdf(formation, participants, formateur, failMock as any)
+    ).rejects.toThrow("DB error");
+  });
 });
