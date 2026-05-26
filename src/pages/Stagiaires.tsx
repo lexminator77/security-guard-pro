@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CertificationsTab } from "@/components/CertificationsTab";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Trash2, Users, Upload, FileText, Download, ArrowLeft, Eye, Archive, RotateCcw, Shield } from "lucide-react";
+import { Plus, Search, Trash2, Users, Upload, FileText, Download, ArrowLeft, Eye, Archive, RotateCcw, Shield, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,6 +49,7 @@ const addMonths = (dateStr: string, months: number): string => {
 export default function Stagiaires() {
   const { roles } = useAuth();
   const isAdmin = roles.includes("administrateur") || roles.includes("secretaire");
+  const navigate = useNavigate();
 
   const [list, setList] = useState<any[]>([]);
   const [q, setQ] = useState("");
@@ -233,6 +235,14 @@ export default function Stagiaires() {
               <Badge variant="outline" className={STATUS_COLOR[selected.status]}>
                 {STATUS_LABEL[selected.status]}
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/passeport-prevention/${selected.id}`)}
+              >
+                <BookOpen className="h-4 w-4 mr-2" />
+                Passeport de prévention
+              </Button>
               {isAdmin && (
                 isArchived ? (
                   <Button size="sm" variant="outline" onClick={() => reactiver(selected)} className="gap-2">

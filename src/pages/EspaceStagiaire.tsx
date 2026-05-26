@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,7 @@ function Messagerie({ messages, setMessages, stagiaireId }: {
 }
 
 export default function EspaceStagiaire() {
+  const navigate = useNavigate();
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stagiaireId, setStagiaireId] = useState<string | null>(null);
@@ -475,6 +477,17 @@ setUnreadFromFormateur(nonLus);
           <p className="text-3xl font-bold text-primary">{docs.length}</p>
           <p className="text-xs text-muted-foreground mt-1">disponibles</p>
         </Card>
+      </div>
+      <div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!stagiaireId}
+          onClick={() => stagiaireId && navigate(`/passeport-prevention/${stagiaireId}`)}
+        >
+          <BookOpen className="h-4 w-4 mr-2" />
+          Mon passeport de prévention
+        </Button>
       </div>
       {formationsEnCours.map((f: any) => (
         <Card key={f.id} className="p-6 bg-emerald-500/5 border-emerald-500/30">
