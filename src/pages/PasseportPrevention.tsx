@@ -149,7 +149,7 @@ export default function PasseportPrevention() {
         </div>
         <Button onClick={handleDownload} disabled={generating}>
           <Download className="h-4 w-4 mr-2" />
-          {generating ? "Génération…" : "Télécharger PDF"}
+          {generating ? "Génération…" : "Télécharger le passeport PDF"}
         </Button>
       </div>
 
@@ -170,7 +170,7 @@ export default function PasseportPrevention() {
         {stagiaire.autorisation_numero && (
           <div className="text-sm">
             <span className="font-medium">Autorisation : </span>
-            {stagiaire.autorisation_type} · {stagiaire.autorisation_numero}
+            {stagiaire.autorisation_numero} · {stagiaire.autorisation_type}
             {stagiaire.autorisation_expiry ? ` (exp. ${fmtDate(stagiaire.autorisation_expiry)})` : ""}
           </div>
         )}
@@ -230,9 +230,9 @@ export default function PasseportPrevention() {
               <thead>
                 <tr className="border-b border-border/50 bg-muted/20">
                   <th className="text-left p-3 font-medium text-xs">Type</th>
-                  <th className="text-left p-3 font-medium text-xs">Obtention</th>
+                  <th className="text-left p-3 font-medium text-xs">Date obtention</th>
                   <th className="text-left p-3 font-medium text-xs">Expiration</th>
-                  <th className="text-left p-3 font-medium text-xs">Formation</th>
+                  <th className="text-left p-3 font-medium text-xs">Formation associée</th>
                   <th className="text-left p-3 font-medium text-xs">Validité</th>
                 </tr>
               </thead>
