@@ -39,6 +39,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         order: () => Promise.resolve({ data: mockDossiers, error: null }),
+        eq: () => Promise.resolve({ data: [], error: null }),
       }),
       update: () => ({ eq: () => Promise.resolve({ error: null }) }),
       delete: () => ({ eq: () => Promise.resolve({ error: null }) }),

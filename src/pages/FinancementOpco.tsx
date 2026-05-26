@@ -107,7 +107,7 @@ export default function FinancementOpco() {
   });
 
   const totalAccorde = dossiers.filter(d => d.statut !== "refuse").reduce((acc, d) => acc + Number(d.montant_accorde), 0);
-  const totalPaye = dossiers.reduce((acc, d) => acc + Number(d.montant_paye), 0);
+  const totalPaye = dossiers.filter(d => d.statut !== "refuse").reduce((acc, d) => acc + Number(d.montant_paye), 0);
   const solde = totalAccorde - totalPaye;
   const fmt = (n: number) => n.toLocaleString("fr-FR");
 
