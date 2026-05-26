@@ -12,25 +12,56 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 
 type R = "administrateur" | "formateur" | "agent" | "secretaire" | "stagiaire";
+type NavItem = { title: string; url: string; icon: any; roles: R[] };
 
-const allItems: { title: string; url: string; icon: any; roles: R[] }[] = [
-  { title: "Tableau de bord", url: "/", icon: LayoutDashboard, roles: ["administrateur","formateur","agent","secretaire","stagiaire"] },
-  { title: "Stagiaires", url: "/stagiaires", icon: Users, roles: ["administrateur","secretaire",] },
-  { title: "Formateurs", url: "/formateurs", icon: UserCheck, roles: ["administrateur","secretaire"] },
-  { title: "Formations", url: "/formations", icon: GraduationCap, roles: ["administrateur","secretaire","formateur","stagiaire"] },
-  { title: "Planning", url: "/planning", icon: Calendar, roles: ["administrateur","secretaire","formateur","stagiaire","agent"] },
-  { title: "Incidents", url: "/incidents", icon: AlertTriangle, roles: ["administrateur","secretaire","formateur","agent"] },
-  { title: "Entreprises", url: "/entreprises", icon: Building2, roles: ["administrateur","secretaire"] },
-  { title: "Documents", url: "/documents", icon: FileText, roles: ["administrateur","secretaire"] },
-  { title: "Facturation", url: "/facturation", icon: Receipt, roles: ["administrateur", "secretaire"] },
-  { title: "Statistiques", url: "/statistiques", icon: BarChart3, roles: ["administrateur"] },
-  { title: "Utilisateurs", url: "/utilisateurs", icon: UserCog, roles: ["administrateur"] },
-  { title: "Audit & Émargements", url: "/audit", icon: ClipboardList, roles: ["administrateur"] },
-  { title: "Compétences", url: "/competences", icon: Award, roles: ["administrateur"] },
-  { title: "Cours", url: "/cours", icon: BookOpen, roles: ["administrateur"] },
-  { title: "Messagerie", url: "/messagerie-admin", icon: MessageSquare, roles: ["administrateur"] },
-  { title: "Rappels & Alertes", url: "/rappels", icon: Bell, roles: ["administrateur"] },
-  { title: "Réclamations", url: "/reclamations", icon: MessageSquareWarning, roles: ["administrateur", "secretaire"] },
+const allGroups: { label: string | null; items: NavItem[] }[] = [
+  {
+    label: null,
+    items: [
+      { title: "Tableau de bord", url: "/", icon: LayoutDashboard, roles: ["administrateur","formateur","agent","secretaire","stagiaire"] },
+    ],
+  },
+  {
+    label: "Formation",
+    items: [
+      { title: "Formations", url: "/formations", icon: GraduationCap, roles: ["administrateur","secretaire","formateur","stagiaire"] },
+      { title: "Planning", url: "/planning", icon: Calendar, roles: ["administrateur","secretaire","formateur","stagiaire","agent"] },
+      { title: "Cours", url: "/cours", icon: BookOpen, roles: ["administrateur"] },
+    ],
+  },
+  {
+    label: "Personnes",
+    items: [
+      { title: "Stagiaires", url: "/stagiaires", icon: Users, roles: ["administrateur","secretaire"] },
+      { title: "Formateurs", url: "/formateurs", icon: UserCheck, roles: ["administrateur","secretaire"] },
+    ],
+  },
+  {
+    label: "Entreprises",
+    items: [
+      { title: "Entreprises", url: "/entreprises", icon: Building2, roles: ["administrateur","secretaire"] },
+      { title: "Documents", url: "/documents", icon: FileText, roles: ["administrateur","secretaire"] },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      { title: "Statistiques", url: "/statistiques", icon: BarChart3, roles: ["administrateur"] },
+      { title: "Audit & Émargements", url: "/audit", icon: ClipboardList, roles: ["administrateur"] },
+      { title: "Compétences", url: "/competences", icon: Award, roles: ["administrateur"] },
+      { title: "Réclamations", url: "/reclamations", icon: MessageSquareWarning, roles: ["administrateur","secretaire"] },
+      { title: "Incidents", url: "/incidents", icon: AlertTriangle, roles: ["administrateur","secretaire","formateur","agent"] },
+      { title: "Facturation", url: "/facturation", icon: Receipt, roles: ["administrateur","secretaire"] },
+    ],
+  },
+  {
+    label: "Système",
+    items: [
+      { title: "Utilisateurs", url: "/utilisateurs", icon: UserCog, roles: ["administrateur"] },
+      { title: "Messagerie", url: "/messagerie-admin", icon: MessageSquare, roles: ["administrateur"] },
+      { title: "Rappels & Alertes", url: "/rappels", icon: Bell, roles: ["administrateur"] },
+    ],
+  },
 ];
 
 export function AppSidebar() {
@@ -39,7 +70,6 @@ export function AppSidebar() {
   const { pathname } = useLocation();
   const { user, signOut, roles } = useAuth();
   const isActive = (p: string) => pathname === p;
-  const mainItems = allItems.filter((i) => i.roles.some((r) => (roles as R[]).includes(r)));
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -58,25 +88,35 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Principal</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} end className={({ isActive: a }) =>
-                      `flex items-center gap-3 ${a ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}`
-                    }>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {allGroups.map((group, gi) => {
+          const visibleItems = group.items.filter(i => i.roles.some(r => (roles as R[]).includes(r)));
+          if (visibleItems.length === 0) return null;
+          return (
+            <SidebarGroup key={gi}>
+              {group.label && !collapsed && (
+                <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold px-2 pt-3 pb-1">
+                  {group.label}
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {visibleItems.map((item) => (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                        <NavLink to={item.url} end className={({ isActive: a }) =>
+                          `flex items-center gap-3 ${a ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}`
+                        }>
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-2">
