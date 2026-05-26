@@ -12,11 +12,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, GraduationCap, Trash2, Calendar, MapPin, Users, UserPlus, UserCheck, Euro, FileText, Download, CheckCircle2, XCircle, Clock, Pencil } from "lucide-react";
+import { Plus, GraduationCap, Trash2, Calendar, MapPin, Users, UserPlus, UserCheck, Euro, FileText, Download, CheckCircle2, XCircle, Clock, Pencil, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { generateAttestation } from "@/lib/generateDocs";
 import { generateConventionPdf } from "@/lib/generateConventionPdf";
 import { generateEmargementPdf } from "@/lib/generateEmargementPdf";
+import { generateFacturePdf } from "@/lib/generateFacturePdf";
 import { QUESTIONNAIRE_LABELS } from "@/lib/questionnaireQuestions";
  
 const TYPES = ["APS", "SST", "SSIAP1", "SSIAP2", "SSIAP3", "MAC_APS", "H0B0", "AUTRE"];
@@ -100,6 +101,9 @@ export default function Formations() {
   const [qSending, setQSending] = useState(false);
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
   const [loadingConvention, setLoadingConvention] = useState<string | null>(null);
+  const [factureModal, setFactureModal] = useState<{ formation: any; participants: any[] } | null>(null);
+  const [factureForm, setFactureForm] = useState({ clientNom: "", clientAdresse: "", clientSiret: "", montantHt: 0, dateEmission: new Date().toISOString().slice(0, 10) });
+  const [creatingFacture, setCreatingFacture] = useState(false);
   const [qResultsOpen, setQResultsOpen] = useState(false);
   const [qResultsData, setQResultsData] = useState<any[]>([]);
   const [qResultsType, setQResultsType] = useState<string>("");
@@ -337,6 +341,30 @@ export default function Formations() {
     else toast.success("Commentaire enregistré");
   };
  
+  const createFacture = async () => {
+    if (!factureModal || !factureForm.clientNom.trim()) return;
+    setCreatingFacture(true);
+    try {
+      const { data, error } = await supabase.from("factures").insert({
+        formation_id: factureModal.formation.id,
+        client_nom: factureForm.clientNom.trim(),
+        client_adresse: factureForm.clientAdresse.trim() || null,
+        client_siret: factureForm.clientSiret.trim() || null,
+        montant_ht: factureForm.montantHt,
+        participant_count: factureModal.participants.length,
+        date_emission: factureForm.dateEmission,
+      }).select().single();
+      if (error) throw new Error(error.message);
+      generateFacturePdf(data, factureModal.formation);
+      toast.success(`Facture ${data.numero} créée`);
+      setFactureModal(null);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erreur lors de la création de la facture");
+    } finally {
+      setCreatingFacture(false);
+    }
+  };
+
   const getFormateurName = (formateurId: string | null) => {
     if (!formateurId) return null;
     const f = formateurs.find(f => f.id === formateurId);
@@ -518,6 +546,15 @@ export default function Formations() {
                 }}>
                 <FileText className="h-3.5 w-3.5 mr-1.5" />
                 {loadingConvention === f.id ? "Génération…" : "Convention de formation"}
+              </Button>
+              <Button size="sm" variant="outline"
+                className="w-full border-blue-400/30 text-blue-400 hover:bg-blue-400/10 text-xs"
+                onClick={() => {
+                  const totalTarif = ps.reduce((acc: number, p: any) => acc + (Number(p.tarif) || 0), 0);
+                  setFactureForm({ clientNom: "", clientAdresse: "", clientSiret: "", montantHt: totalTarif, dateEmission: new Date().toISOString().slice(0, 10) });
+                  setFactureModal({ formation: f, participants: ps });
+                }}>
+                <Receipt className="h-3.5 w-3.5 mr-1.5" /> Créer la facture
               </Button>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider pt-1">Attestations individuelles</p>
               {ps.map(p => p.stagiaire).filter(Boolean).map((s: any) => (
@@ -830,6 +867,74 @@ export default function Formations() {
           </div>
         </DialogContent>
       </Dialog>
+      {factureModal && (
+        <Dialog open={!!factureModal} onOpenChange={(v) => !v && setFactureModal(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Créer une facture — {factureModal.formation.title}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label className="text-sm font-medium">Client — Nom / Raison sociale *</Label>
+                <Input
+                  className="mt-1"
+                  value={factureForm.clientNom}
+                  onChange={e => setFactureForm(f => ({ ...f, clientNom: e.target.value }))}
+                  placeholder="Sécurimax SARL / Jean Dupont / France Travail…"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Adresse</Label>
+                <Textarea
+                  className="mt-1"
+                  rows={2}
+                  value={factureForm.clientAdresse}
+                  onChange={e => setFactureForm(f => ({ ...f, clientAdresse: e.target.value }))}
+                  placeholder="12 rue des Lilas, 75001 Paris"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">SIRET <span className="text-muted-foreground font-normal">(optionnel — B2B)</span></Label>
+                <Input
+                  className="mt-1"
+                  value={factureForm.clientSiret}
+                  onChange={e => setFactureForm(f => ({ ...f, clientSiret: e.target.value }))}
+                  placeholder="123 456 789 00012"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm font-medium">Montant HT (€)</Label>
+                  <Input
+                    className="mt-1"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={factureForm.montantHt}
+                    onChange={e => setFactureForm(f => ({ ...f, montantHt: Number(e.target.value) }))}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Date d'émission</Label>
+                  <Input
+                    className="mt-1"
+                    type="date"
+                    value={factureForm.dateEmission}
+                    onChange={e => setFactureForm(f => ({ ...f, dateEmission: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                disabled={!factureForm.clientNom.trim() || creatingFacture}
+                onClick={createFacture}
+              >
+                {creatingFacture ? "Création…" : "Créer et télécharger"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
