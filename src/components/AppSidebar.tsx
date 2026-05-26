@@ -2,7 +2,7 @@
 import {
   LayoutDashboard, Users, GraduationCap, AlertTriangle,
   Calendar, FileText, BarChart3, Shield,
-  LogOut, UserCog, UserCheck, Award, ClipboardList, BookOpen, MessageSquare, MessageSquareWarning, Bell, Building2, Receipt
+  LogOut, UserCog, UserCheck, Award, ClipboardList, BookOpen, MessageSquare, MessageSquareWarning, Bell, Building2, Receipt, Landmark
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -52,6 +52,7 @@ const allGroups: { label: string | null; items: NavItem[] }[] = [
       { title: "Réclamations", url: "/reclamations", icon: MessageSquareWarning, roles: ["administrateur","secretaire"] },
       { title: "Incidents", url: "/incidents", icon: AlertTriangle, roles: ["administrateur","secretaire","formateur","agent"] },
       { title: "Facturation", url: "/facturation", icon: Receipt, roles: ["administrateur","secretaire"] },
+      { title: "Financement OPCO", url: "/financement-opco", icon: Landmark, roles: ["administrateur","secretaire"] },
     ],
   },
   {
