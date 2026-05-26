@@ -167,6 +167,7 @@ export async function generatePasseportPdf(
       headStyles: { fillColor: [44, 44, 44], textColor: [212, 175, 55], fontStyle: "bold" },
       margin: { left: 15, right: 15 },
     });
+    y = ((doc as any).lastAutoTable?.finalY ?? y + 20) + 4;
   }
 
   // Pied de page
