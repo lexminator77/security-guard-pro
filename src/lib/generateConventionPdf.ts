@@ -47,8 +47,8 @@ export async function generateConventionPdf(
   supabase: SupabaseClient
 ): Promise<void> {
   const { data: entreprises, error: rhError } = await supabase
-    .from("entreprise_rh")
-    .select("nom, contact_nom, contact_prenom, adresse, code_postal, ville, email, telephone, siret");
+    .from("entreprises")
+    .select("nom, contact_nom, contact_prenom, adresse, email, telephone, siret");
   if (rhError) throw new Error(rhError.message);
   const e = entreprises?.length === 1 ? entreprises[0] : null;
 
@@ -75,7 +75,7 @@ export async function generateConventionPdf(
   y = sectionTitle(doc, "Article 02 — LE CLIENT", y);
   y = labelValue(doc, "Raison sociale / Nom", e?.nom ?? "", y);
   y = labelValue(doc, "Contact", e ? `${e.contact_prenom ?? ""} ${e.contact_nom ?? ""}`.trim() : "", y);
-  y = labelValue(doc, "Adresse", e ? `${e.adresse ?? ""} ${e.code_postal ?? ""} ${e.ville ?? ""}`.trim() : "", y);
+  y = labelValue(doc, "Adresse", e?.adresse ?? "", y);
   y = labelValue(doc, "Email", e?.email ?? "", y);
   y = labelValue(doc, "Téléphone", e?.telephone ?? "", y);
   y = labelValue(doc, "SIRET", e?.siret ?? "", y);
