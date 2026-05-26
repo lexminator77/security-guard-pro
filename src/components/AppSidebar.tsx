@@ -2,7 +2,7 @@
 import {
   LayoutDashboard, Users, GraduationCap, AlertTriangle,
   Calendar, FileText, BarChart3, Shield,
-  LogOut, UserCog, UserCheck, Award, ClipboardList, BookOpen, MessageSquare, MessageSquareWarning, Bell, Building2
+  LogOut, UserCog, UserCheck, Award, ClipboardList, BookOpen, MessageSquare, MessageSquareWarning, Bell, Building2, Receipt
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -22,6 +22,7 @@ const allItems: { title: string; url: string; icon: any; roles: R[] }[] = [
   { title: "Incidents", url: "/incidents", icon: AlertTriangle, roles: ["administrateur","secretaire","formateur","agent"] },
   { title: "Entreprises", url: "/entreprises", icon: Building2, roles: ["administrateur","secretaire"] },
   { title: "Documents", url: "/documents", icon: FileText, roles: ["administrateur","secretaire"] },
+  { title: "Facturation", url: "/facturation", icon: Receipt, roles: ["administrateur", "secretaire"] },
   { title: "Statistiques", url: "/statistiques", icon: BarChart3, roles: ["administrateur"] },
   { title: "Utilisateurs", url: "/utilisateurs", icon: UserCog, roles: ["administrateur"] },
   { title: "Audit & Émargements", url: "/audit", icon: ClipboardList, roles: ["administrateur"] },
