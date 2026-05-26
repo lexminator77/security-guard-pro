@@ -18,6 +18,7 @@ import { generateAttestation } from "@/lib/generateDocs";
 import { generateConventionPdf } from "@/lib/generateConventionPdf";
 import { generateEmargementPdf } from "@/lib/generateEmargementPdf";
 import { generateFacturePdf } from "@/lib/generateFacturePdf";
+import { generateContratPdf } from "@/lib/generateContratPdf";
 import { QUESTIONNAIRE_LABELS } from "@/lib/questionnaireQuestions";
  
 const TYPES = ["APS", "SST", "SSIAP1", "SSIAP2", "SSIAP3", "MAC_APS", "H0B0", "AUTRE"];
@@ -104,6 +105,9 @@ export default function Formations() {
   const [factureModal, setFactureModal] = useState<{ formation: any; participants: any[] } | null>(null);
   const [factureForm, setFactureForm] = useState({ clientNom: "", clientAdresse: "", clientSiret: "", montantHt: 0, dateEmission: new Date().toISOString().slice(0, 10) });
   const [creatingFacture, setCreatingFacture] = useState(false);
+  const [contratModal, setContratModal] = useState<{ stagiaire: any; formation: any; tarif: number | null } | null>(null);
+  const [contratFinancement, setContratFinancement] = useState<"particulier" | "cpf">("particulier");
+  const [generatingContrat, setGeneratingContrat] = useState(false);
   const [qResultsOpen, setQResultsOpen] = useState(false);
   const [qResultsData, setQResultsData] = useState<any[]>([]);
   const [qResultsType, setQResultsType] = useState<string>("");
@@ -341,6 +345,25 @@ export default function Formations() {
     else toast.success("Commentaire enregistré");
   };
  
+  const generateContrat = async () => {
+    if (!contratModal) return;
+    setGeneratingContrat(true);
+    try {
+      await generateContratPdf(
+        contratModal.stagiaire,
+        contratModal.formation,
+        contratModal.tarif,
+        contratFinancement,
+        supabase
+      );
+      setContratModal(null);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erreur lors de la génération du contrat");
+    } finally {
+      setGeneratingContrat(false);
+    }
+  };
+
   const createFacture = async () => {
     if (!factureModal || !factureForm.clientNom.trim()) return;
     setCreatingFacture(true);
@@ -557,13 +580,27 @@ export default function Formations() {
                 <Receipt className="h-3.5 w-3.5 mr-1.5" /> Créer la facture
               </Button>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider pt-1">Attestations individuelles</p>
-              {ps.map(p => p.stagiaire).filter(Boolean).map((s: any) => (
-                <Button key={s.id} size="sm" variant="outline"
-                  className="w-full border-yellow-400/20 text-yellow-300 hover:bg-yellow-400/10 text-xs justify-start"
-                  onClick={() => generateAttestation(f, s, formateurObj)}>
-                  <Download className="h-3 w-3 mr-1.5 shrink-0" />
-                  <span className="truncate">{s.last_name?.toUpperCase()} {s.first_name}</span>
-                </Button>
+              {ps.filter(p => p.stagiaire).map((p: any) => (
+                <div key={p.id} className="flex flex-col gap-1">
+                  <Button size="sm" variant="outline"
+                    className="w-full border-yellow-400/20 text-yellow-300 hover:bg-yellow-400/10 text-xs justify-start"
+                    onClick={() => generateAttestation(f, p.stagiaire, formateurObj)}>
+                    <Download className="h-3 w-3 mr-1.5 shrink-0" />
+                    <span className="truncate">{p.stagiaire.last_name?.toUpperCase()} {p.stagiaire.first_name}</span>
+                  </Button>
+                  <Button size="sm" variant="outline"
+                    className="w-full border-purple-400/30 text-purple-400 hover:bg-purple-400/10 text-xs"
+                    onClick={() => {
+                      setContratFinancement("particulier");
+                      setContratModal({
+                        stagiaire: p.stagiaire,
+                        formation: f,
+                        tarif: p.tarif ?? null,
+                      });
+                    }}>
+                    <FileText className="h-3.5 w-3.5 mr-1.5" /> Contrat individuel
+                  </Button>
+                </div>
               ))}
             </div>
           )}
@@ -867,6 +904,54 @@ export default function Formations() {
           </div>
         </DialogContent>
       </Dialog>
+      {contratModal && (
+        <Dialog open={!!contratModal} onOpenChange={(v) => !v && setContratModal(null)}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>
+                Contrat individuel — {contratModal.stagiaire?.last_name} {contratModal.stagiaire?.first_name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label className="text-sm font-medium">Mode de financement</Label>
+                <div className="flex gap-3 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="financement"
+                      value="particulier"
+                      checked={contratFinancement === "particulier"}
+                      onChange={() => setContratFinancement("particulier")}
+                    />
+                    <span className="text-sm">Particulier</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="financement"
+                      value="cpf"
+                      checked={contratFinancement === "cpf"}
+                      onChange={() => setContratFinancement("cpf")}
+                    />
+                    <span className="text-sm">CPF</span>
+                  </label>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tarif : {contratModal.tarif != null ? `${contratModal.tarif} €` : "non renseigné"}
+              </p>
+              <Button
+                className="w-full"
+                disabled={generatingContrat}
+                onClick={generateContrat}
+              >
+                {generatingContrat ? "Génération…" : "Générer le contrat"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
       {factureModal && (
         <Dialog open={!!factureModal} onOpenChange={(v) => !v && setFactureModal(null)}>
           <DialogContent className="sm:max-w-md">
