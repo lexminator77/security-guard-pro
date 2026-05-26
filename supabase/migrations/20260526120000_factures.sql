@@ -37,9 +37,6 @@ ALTER TABLE public.factures ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_secretaire_factures" ON public.factures
   FOR ALL
   USING (
-    EXISTS (
-      SELECT 1 FROM public.user_roles
-      WHERE user_id = auth.uid()
-        AND role IN ('admin', 'secretaire')
-    )
+    public.has_role(auth.uid(), 'administrateur')
+    OR public.has_role(auth.uid(), 'secretaire')
   );
