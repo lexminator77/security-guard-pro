@@ -13,12 +13,22 @@ vi.mock("@/integrations/supabase/client", () => ({
       select: () => ({
         order: () => Promise.resolve({ data: mockFactures, error: null }),
       }),
+      update: () => ({
+        eq: () => Promise.resolve({ error: null }),
+      }),
+      delete: () => ({
+        eq: () => Promise.resolve({ error: null }),
+      }),
     }),
   },
 }));
 
 vi.mock("@/lib/generateFacturePdf", () => ({
   generateFacturePdf: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
 }));
 
 describe("Facturation", () => {

@@ -33,31 +33,35 @@ export default function Facturation() {
   const [factures, setFactures] = useState<Facture[]>([]);
   const [filtre, setFiltre] = useState<"all" | "brouillon" | "envoye" | "paye">("all");
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const load = async () => {
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    const { data, error } = await supabase
+    supabase
       .from("factures")
       .select("*, formation:formations(title, type, start_date, end_date, duration_hours)")
-      .order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
-    else setFactures(data ?? []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) toast.error(error.message);
+        else setFactures(data ?? []);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [reloadKey]);
 
   const updateStatut = async (id: string, statut: string) => {
     const { error } = await supabase.from("factures").update({ statut }).eq("id", id);
     if (error) toast.error(error.message);
-    else { toast.success("Statut mis à jour"); load(); }
+    else { toast.success("Statut mis à jour"); setReloadKey(k => k + 1); }
   };
 
   const deleteFacture = async (id: string) => {
     if (!confirm("Supprimer cette facture ?")) return;
     const { error } = await supabase.from("factures").delete().eq("id", id);
     if (error) toast.error(error.message);
-    else { toast.success("Facture supprimée"); load(); }
+    else { toast.success("Facture supprimée"); setReloadKey(k => k + 1); }
   };
 
   const displayed = filtre === "all" ? factures : factures.filter(f => f.statut === filtre);
@@ -100,7 +104,7 @@ export default function Facturation() {
               <div className="text-right shrink-0">
                 <p className="font-semibold">{Number(f.montant_ht).toLocaleString("fr-FR")} € HT</p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(f.date_emission).toLocaleDateString("fr-FR")}
+                  {new Date(f.date_emission + "T00:00:00").toLocaleDateString("fr-FR")}
                 </p>
               </div>
               <div className="flex gap-2 shrink-0 flex-wrap">
