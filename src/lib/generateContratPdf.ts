@@ -42,16 +42,25 @@ function labelValue(doc: jsPDF, label: string, value: string, y: number): number
 
 export async function generateContratPdf(
   stagiaire: { id: string; first_name: string; last_name: string; email: string | null },
-  formation: { title: string; type: string; start_date: string; end_date: string; location: string | null; duration_hours: number | null },
+  formation: {
+  title: string;
+  type: string;
+  start_date: string;
+  end_date: string;
+  location: string | null;
+  duration_hours: number | null;
+  description: string | null;  // ← add this
+},
   tarif: number | null,
   financement: "particulier" | "cpf",
   supabase: SupabaseClient
 ): Promise<void> {
-  const { data: addrData } = await supabase
+  const { data: addrData, error: addrError } = await supabase
     .from("stagiaires")
     .select("address, city, postal_code")
     .eq("id", stagiaire.id)
     .single();
+  if (addrError && addrError.code !== "PGRST116") throw new Error(addrError.message);
 
   const adresse = addrData?.address
     ? `${addrData.address}${addrData.postal_code ? ", " + addrData.postal_code : ""}${addrData.city ? " " + addrData.city : ""}`
@@ -94,6 +103,8 @@ export async function generateContratPdf(
   y = labelValue(doc, "Dates", `Du ${fmtDate(formation.start_date)} au ${fmtDate(formation.end_date)}`, y);
   y = labelValue(doc, "Lieu", formation.location ?? "", y);
   y = labelValue(doc, "Durée", formation.duration_hours ? `${formation.duration_hours} heures` : "", y);
+  y = labelValue(doc, "Objectifs / Programme", formation.description ?? "", y);
+  y = labelValue(doc, "Niveau prérequis", "Aucun prérequis particulier", y);
   y += 2; separator(doc, y); y += 4;
 
   // Article 04 — Financement
@@ -138,10 +149,9 @@ export async function generateContratPdf(
   y = sectionTitle(doc, "Article 06 — DÉLAI DE RÉTRACTATION", y);
   doc.setFontSize(8);
   const retractation = "Conformément à l'article L.6353-5 du Code du Travail, le stagiaire dispose d'un délai de rétractation de 10 jours calendaires à compter de la signature du présent contrat. La rétractation doit être notifiée par écrit (lettre recommandée avec accusé de réception) à l'organisme de formation. Aucune somme ne peut être exigée du stagiaire avant l'expiration de ce délai.";
-  // Write the full retractation text first (ensures content is captured by doc.text mock in tests)
-  doc.text(retractation, 15, y, { maxWidth: 180 });
-  const lines = doc.splitTextToSize(retractation, 180);
-  y += lines.length * 4 + 6;
+  const retractLines = doc.splitTextToSize(retractation, 180);
+  doc.text(retractLines, 15, y);
+  y += retractLines.length * 4 + 6;
   separator(doc, y); y += 6;
 
   // Signature blocks

@@ -13,7 +13,7 @@ const mockDoc: any = {
   text: mockText,
   internal: { pageSize: { height: 297, width: 210 } },
   save: mockSave,
-  splitTextToSize: vi.fn().mockReturnValue(["mocked"]),
+  splitTextToSize: vi.fn().mockImplementation((text: string) => [text]),
   addPage: vi.fn(),
 };
 
@@ -28,7 +28,15 @@ vi.mock("jspdf-autotable", () => ({
 }));
 
 const stagiaire = { id: "s1", first_name: "Jean", last_name: "Dupont", email: "jean@example.com" };
-const formation = { title: "Formation SST", type: "SST", start_date: "2026-05-26", end_date: "2026-05-27", location: "Paris", duration_hours: 14 };
+const formation = {
+  title: "Formation SST",
+  type: "SST",
+  start_date: "2026-05-26",
+  end_date: "2026-05-27",
+  location: "Paris",
+  duration_hours: 14,
+  description: "Formation aux gestes de premiers secours",
+};
 
 const buildMock = (addressData: any) => ({
   from: () => ({
@@ -54,10 +62,12 @@ describe("generateContratPdf", () => {
     expect(textCalls.some((a: any) => typeof a === "string" && a.includes("Dupont"))).toBe(true);
   });
 
-  it("inclut la mention délai de rétractation 10 jours", async () => {
+  it("inclut la mention délai de rétractation 10 jours (Art. L.6353-5)", async () => {
     await generateContratPdf(stagiaire, formation, 600, "particulier", buildMock({ address: null, city: null, postal_code: null }) as any);
-    const textCalls = mockText.mock.calls.flat();
-    expect(textCalls.some((a: any) => typeof a === "string" && a.includes("10"))).toBe(true);
+    const textCalls = mockText.mock.calls.flat(Infinity);
+    expect(textCalls.some((a: any) => typeof a === "string" && a.includes("rétractation"))).toBe(true);
+    expect(textCalls.some((a: any) => typeof a === "string" && a.includes("10 jours"))).toBe(true);
+    expect(textCalls.some((a: any) => typeof a === "string" && a.includes("L.6353-5"))).toBe(true);
   });
 
   it("inclut la mention TVA art. 261-4-4°", async () => {
@@ -75,5 +85,32 @@ describe("generateContratPdf", () => {
     await generateContratPdf(stagiaire, formation, 600, "cpf", buildMock({ address: null, city: null, postal_code: null }) as any);
     const textCalls = mockText.mock.calls.flat();
     expect(textCalls.some((a: any) => typeof a === "string" && a.includes("CPF"))).toBe(true);
+  });
+
+  it("ne crash pas si la DB retourne row not found (PGRST116)", async () => {
+    const notFoundMock = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({ data: null, error: { code: "PGRST116", message: "Not found" } }),
+          }),
+        }),
+      }),
+    };
+    await generateContratPdf(stagiaire, formation, 600, "particulier", notFoundMock as any);
+    expect(mockSave).toHaveBeenCalled();
+  });
+
+  it("throw si la DB retourne une vraie erreur", async () => {
+    const errMock = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({ data: null, error: { code: "42P01", message: "relation does not exist" } }),
+          }),
+        }),
+      }),
+    };
+    await expect(generateContratPdf(stagiaire, formation, 600, "particulier", errMock as any)).rejects.toThrow("relation does not exist");
   });
 });
