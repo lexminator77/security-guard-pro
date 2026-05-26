@@ -433,6 +433,7 @@ export default function Formations() {
 
   const saveOpcoDossier = async () => {
     if (!opcoModal || !opcoForm.opco_nom.trim()) return;
+    if (opcoForm.perimetre === "stagiaire" && !opcoForm.stagiaire_id) return;
     setSavingOpco(true);
     try {
       const { error } = await supabase.from("financements_opco").insert({
@@ -1145,7 +1146,7 @@ export default function Formations() {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           Accordé : {Number(d.montant_accorde).toLocaleString("fr-FR")} €
-                          {" · "}Payé : {Number(d.montant_paye).toLocaleString("fr-FR")} €
+                          {" · "}Payé : {Number(d.montant_paye ?? 0).toLocaleString("fr-FR")} €
                         </p>
                         <div className="flex gap-2 flex-wrap">
                           {cfg.next && (
