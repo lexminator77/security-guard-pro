@@ -32,6 +32,7 @@ import Documents from "./pages/Documents";
 import Statistiques from "./pages/Statistiques";
 import Facturation from "./pages/Facturation";
 import FinancementOpco from "./pages/FinancementOpco";
+import PasseportPrevention from "./pages/PasseportPrevention";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const App = () => (
             <Route path="/espace-stagiaire" element={<EspaceStagiaire />} />
             <Route path="/espace-formateur" element={<EspaceFormateur />} />
             <Route path="/espace-rh" element={<EspaceRH />} />
+            <Route path="/passeport-prevention/:stagiaireId" element={<PasseportPrevention />} />
             <Route path="/q/:token" element={<QuestionnairePublic />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
