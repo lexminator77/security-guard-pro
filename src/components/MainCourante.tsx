@@ -313,58 +313,126 @@ export function MainCouranteFormateur({ formateurId }: { formateurId: string }) 
   const [fiches, setFiches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtre, setFiltre] = useState<"toutes" | "brouillon" | "valide">("toutes");
+  const [onglet, setOnglet] = useState<"aujourd_hui" | "consultation">("aujourd_hui");
+  const [filtreDateRange, setFiltreDateRange] = useState<FiltreDateValue>({ type: "preset", preset: "toutes" });
+
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const { data } = await supabase.from("main_courante").select("*, stagiaire:stagiaires(first_name, last_name), formation:formations(title, type)").order("created_at", { ascending: false });
+      const { data } = await supabase
+        .from("main_courante")
+        .select("*, stagiaire:stagiaires(first_name, last_name), formation:formations(title, type)")
+        .order("date_debut", { ascending: false })
+        .order("heure_debut", { ascending: false });
       const fichesAvecHisto = await Promise.all((data ?? []).map(async (fiche) => {
         const { data: histo } = await supabase.from("main_courante_historique").select("*").eq("main_courante_id", fiche.id).order("created_at", { ascending: true });
         return { ...fiche, historique: histo ?? [] };
       }));
-      setFiches(fichesAvecHisto); setLoading(false);
+      setFiches(fichesAvecHisto);
+      setLoading(false);
     };
     load();
   }, [formateurId]);
 
-  const fichesFiltrees = filtre === "toutes" ? fiches : fiches.filter(f => f.statut === filtre);
+  const fichesParStatut = filtre === "toutes" ? fiches : fiches.filter(f => f.statut === filtre);
+  const fichesFiltrees = onglet === "aujourd_hui"
+    ? fichesParStatut.filter(f => f.date_debut === todayStr)
+    : fichesParStatut.filter(f => appliquerFiltreDateRange(f.date_debut, filtreDateRange));
+
+  const nbAujourdhui = fiches.filter(f => f.date_debut === todayStr).length;
 
   return (
     <div className="space-y-6">
+      {/* En-tête */}
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-display font-bold">Main courante</h1><p className="text-muted-foreground text-sm mt-1">Fiches saisies par vos stagiaires</p></div>
-        <Badge variant="outline" className="border-primary/40 text-primary">{fiches.length} fiche{fiches.length > 1 ? "s" : ""}</Badge>
+        <div>
+          <h1 className="text-2xl font-display font-bold">Main courante</h1>
+          <p className="text-muted-foreground text-sm mt-1">Fiches saisies par vos stagiaires</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {nbAujourdhui > 0 && (
+            <Badge variant="outline" className="border-primary/40 text-primary">
+              {nbAujourdhui} aujourd'hui
+            </Badge>
+          )}
+          <Badge variant="outline" className="border-border/40 text-muted-foreground">
+            {fiches.length} fiche{fiches.length > 1 ? "s" : ""}
+          </Badge>
+        </div>
       </div>
+
+      {/* Onglets Aujourd'hui / Consultation */}
+      <div className="flex gap-1 p-1 bg-muted/30 rounded-lg w-fit">
+        {([
+          { key: "aujourd_hui", label: "Aujourd'hui" },
+          { key: "consultation", label: "Consultation" },
+        ] as const).map(o => (
+          <button
+            key={o.key}
+            onClick={() => setOnglet(o.key)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              onglet === o.key
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Filtre date — onglet Consultation uniquement */}
+      {onglet === "consultation" && (
+        <FiltreDateRange value={filtreDateRange} onChange={setFiltreDateRange} />
+      )}
+
+      {/* Filtre statut */}
       <div className="flex gap-2">
         {(["toutes", "valide", "brouillon"] as const).map(f => (
           <button key={f} onClick={() => setFiltre(f)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${filtre === f ? "bg-primary/20 text-primary" : "bg-muted/30 text-muted-foreground hover:bg-muted/50"}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              filtre === f ? "bg-primary/20 text-primary" : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+            }`}>
             {f === "toutes" ? "Toutes" : f === "valide" ? "Validées" : "Brouillons"}
           </button>
         ))}
       </div>
-      {loading ? <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p>
-        : fichesFiltrees.length === 0 ? <Card className="p-12 text-center border-dashed"><p className="text-muted-foreground text-sm">Aucune fiche</p></Card>
-        : <div className="space-y-3">{fichesFiltrees.map(f => (
-          <div key={f.id} className="space-y-2">
-            <FicheCard fiche={f} readOnly />
-            {f.historique && f.historique.length > 1 && (
-              <div className="ml-4 border-l-2 border-primary/20 pl-4 space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Historique des modifications</p>
-                {f.historique.map((h: any, i: number) => (
-                  <div key={h.id} className="bg-muted/20 border border-border/30 rounded-lg p-3 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-primary">{i === 0 ? "Création" : `Modification ${i}`}</span>
-                      <span className="text-xs text-muted-foreground">{new Date(h.created_at).toLocaleDateString("fr-FR")} à {new Date(h.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+
+      {/* Liste des fiches */}
+      {loading ? (
+        <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p>
+      ) : fichesFiltrees.length === 0 ? (
+        <Card className="p-12 text-center border-dashed">
+          <p className="text-muted-foreground text-sm">
+            {onglet === "aujourd_hui" ? "Aucune fiche pour aujourd'hui" : "Aucune fiche sur cette période"}
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {fichesFiltrees.map(f => (
+            <div key={f.id} className="space-y-2">
+              <FicheCard fiche={f} readOnly />
+              {f.historique && f.historique.length > 1 && (
+                <div className="ml-4 border-l-2 border-primary/20 pl-4 space-y-2">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Historique des modifications</p>
+                  {f.historique.map((h: any, i: number) => (
+                    <div key={h.id} className="bg-muted/20 border border-border/30 rounded-lg p-3 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-primary">{i === 0 ? "Création" : `Modification ${i}`}</span>
+                        <span className="text-xs text-muted-foreground">{new Date(h.created_at).toLocaleDateString("fr-FR")} à {new Date(h.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground"><span className="text-foreground font-medium">{h.snapshot.famille}</span> — {h.snapshot.type_evenement}</p>
+                      {h.snapshot.description && <p className="text-xs text-muted-foreground italic">"{h.snapshot.description}"</p>}
                     </div>
-                    <p className="text-xs text-muted-foreground"><span className="text-foreground font-medium">{h.snapshot.famille}</span> — {h.snapshot.type_evenement}</p>
-                    {h.snapshot.description && <p className="text-xs text-muted-foreground italic">"{h.snapshot.description}"</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}</div>}
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
