@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { SignatureModal } from "@/components/SignatureModal";
 
 const mockPad = {
@@ -15,8 +15,13 @@ vi.mock("signature_pad", () => ({
 
 describe("SignatureModal", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     mockPad.isEmpty.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("affiche le dialog quand open=true", () => {
@@ -43,6 +48,7 @@ describe("SignatureModal", () => {
         onClose={vi.fn()}
       />
     );
+    await act(async () => { vi.advanceTimersByTime(150); });
     fireEvent.click(screen.getByRole("button", { name: /confirmer/i }));
     expect(mockPad.isEmpty).toHaveBeenCalled();
   });
@@ -58,11 +64,14 @@ describe("SignatureModal", () => {
         onClose={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: /confirmer/i }));
-    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith("data:image/png;base64,abc123"));
+    await act(async () => { vi.advanceTimersByTime(150); });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /confirmer/i }));
+    });
+    expect(onConfirm).toHaveBeenCalledWith("data:image/png;base64,abc123");
   });
 
-  it("appelle clear sur clic Effacer", () => {
+  it("appelle clear sur clic Effacer", async () => {
     render(
       <SignatureModal
         open={true}
@@ -71,6 +80,7 @@ describe("SignatureModal", () => {
         onClose={vi.fn()}
       />
     );
+    await act(async () => { vi.advanceTimersByTime(150); });
     fireEvent.click(screen.getByRole("button", { name: /effacer/i }));
     expect(mockPad.clear).toHaveBeenCalled();
   });
