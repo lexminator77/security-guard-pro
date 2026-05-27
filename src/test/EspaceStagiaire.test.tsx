@@ -42,6 +42,7 @@ const buildSupabaseMock = (formations: any[]) => ({
       }),
     };
   },
+  rpc: () => Promise.resolve({ data: null, error: null }),
   storage: { from: () => ({ getPublicUrl: () => ({ data: { publicUrl: "" } }) }) },
   channel: () => ({ on: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }) }),
 });

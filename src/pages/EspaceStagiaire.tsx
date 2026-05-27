@@ -159,6 +159,11 @@ const [menuOpsOpen, setMenuOpsOpen] = useState(false);
       return;
     }
 
+    // Lie auth_user_id si pas encore fait (nécessaire pour les politiques RLS émargements)
+    if (!fiche.auth_user_id) {
+      await supabase.rpc("link_stagiaire_auth");
+    }
+
     setStagiaire(fiche);
     setStagiaireId(fiche.id);
     setLoading(false);
