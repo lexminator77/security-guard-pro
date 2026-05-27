@@ -113,13 +113,17 @@ Deno.serve(async (req) => {
   const now = new Date().toISOString();
 
   for (const agent of (agents ?? [])) {
-    const { statut, result } = await verifyCarte(agent.carte_pro_number);
-    await db.from("stagiaires").update({
-      cnaps_statut: statut,
-      cnaps_last_checked: now,
-      cnaps_last_result: result,
-    }).eq("id", agent.id);
-    results.push({ id: agent.id, statut });
+    try {
+      const { statut, result } = await verifyCarte(agent.carte_pro_number);
+      await db.from("stagiaires").update({
+        cnaps_statut: statut,
+        cnaps_last_checked: now,
+        cnaps_last_result: result,
+      }).eq("id", agent.id);
+      results.push({ id: agent.id, statut });
+    } catch (e: any) {
+      results.push({ id: agent.id, statut: "a_verifier" });
+    }
   }
 
   return new Response(
