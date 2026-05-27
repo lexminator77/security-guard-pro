@@ -33,6 +33,7 @@ import Statistiques from "./pages/Statistiques";
 import Facturation from "./pages/Facturation";
 import FinancementOpco from "./pages/FinancementOpco";
 import PasseportPrevention from "./pages/PasseportPrevention";
+import VerificationCNAPS from "./pages/VerificationCNAPS";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/documents" element={<Documents />} />
               <Route path="/facturation" element={<Facturation />} />
               <Route path="/financement-opco" element={<FinancementOpco />} />
+              <Route path="/verification-cnaps" element={<VerificationCNAPS />} />
               <Route path="/statistiques" element={<Statistiques />} />
             </Route>
             <Route path="/espace-stagiaire" element={<EspaceStagiaire />} />
