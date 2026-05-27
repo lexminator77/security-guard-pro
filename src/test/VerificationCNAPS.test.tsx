@@ -52,7 +52,6 @@ const mockFetch = vi.fn().mockResolvedValue({
   ok: true,
   json: () => Promise.resolve({ ok: true, processed: 3, results: [] }),
 });
-vi.stubGlobal("fetch", mockFetch);
 
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
@@ -67,8 +66,8 @@ function renderPage() {
 }
 
 describe("VerificationCNAPS", () => {
-  beforeEach(() => vi.clearAllMocks());
-  afterEach(() => cleanup());
+  beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal("fetch", mockFetch); });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
   it("affiche le tableau avec les 3 agents et leurs badges", async () => {
     renderPage();

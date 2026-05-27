@@ -1,6 +1,6 @@
 // src/pages/VerificationCNAPS.tsx
 // @ts-nocheck
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,9 @@ export default function VerificationCNAPS() {
   const [verifyingAll, setVerifyingAll] = useState(false);
   const [filtre, setFiltre] = useState<Filtre>("tous");
 
+  const isMounted = useRef(true);
+  useEffect(() => () => { isMounted.current = false; }, []);
+
   const SUPABASE_URL = (supabase as any).supabaseUrl as string;
 
   async function load() {
@@ -47,6 +50,7 @@ export default function VerificationCNAPS() {
       .from("stagiaires")
       .select("id, first_name, last_name, carte_pro_number, cnaps_statut, cnaps_last_checked")
       .order("last_name");
+    if (!isMounted.current) return;
     if (error) toast.error(error.message);
     else setAgents(data ?? []);
     setLoading(false);
