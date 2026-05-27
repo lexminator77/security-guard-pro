@@ -1328,16 +1328,19 @@ export function RondierStagiaire({ stagiaireId }: { stagiaireId: string }) {
   const [rondeEnCours, setRondeEnCours] = useState<any | null>(null);
   const [scans, setScans] = useState<any[]>([]);
   const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<string | null>(null);
   const [rondes, setRondes] = useState<any[]>([]);
   const scannerRef = useRef<any>(null);
-const scannerDivRef = useRef<HTMLDivElement>(null);
+  const scannerDivRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const processingRef = useRef(false);
+  const circuitsRef = useRef<any[]>([]);
 
   const load = async () => {
     setLoading(true);
     const { data: c } = await supabase.from("circuits_ronde").select("*, points:points_controle(*)").eq("actif", true).order("created_at", { ascending: false });
     const { data: r } = await supabase.from("rondes").select("*, circuit:circuits_ronde(nom), scans:scans_ronde(*, point:points_controle(nom))").eq("stagiaire_id", stagiaireId).order("created_at", { ascending: false }).limit(10);
     setCircuits(c ?? []);
+    circuitsRef.current = c ?? [];
     setRondes(r ?? []);
     // Vérifier si une ronde est en cours
     const enCours = (r ?? []).find(ro => ro.statut === "en_cours");
@@ -1376,16 +1379,16 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
     setScans(newScans);
     toast.success(`✓ ${pointNom} scanné !`);
     // Vérifier si tous les points sont scannés
-    const circuitActuel = circuits.find(c => c.id === rondeEnCours.circuit_id);
+    const circuitActuel = circuitsRef.current.find(c => c.id === rondeEnCours.circuit_id);
     if (circuitActuel && newScans.length >= circuitActuel.points.length) {
       setTimeout(() => toast.success("🎉 Tous les points scannés ! Ronde complète !"), 500);
       await terminerRonde();
     }
   };
 
- const lancerScanner = async () => {
+  const lancerScanner = async () => {
+    processingRef.current = false;
     setScanning(true);
-    setScanResult(null);
     setTimeout(async () => {
       if (!scannerDivRef.current) return;
       try {
@@ -1394,6 +1397,7 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
         scannerRef.current = codeReader;
 
         const videoElement = document.createElement("video");
+        videoRef.current = videoElement;
         videoElement.style.width = "100%";
         videoElement.style.borderRadius = "8px";
         videoElement.setAttribute("playsinline", "true");
@@ -1403,18 +1407,17 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
         await codeReader.decodeFromConstraints(
           { video: { facingMode: "environment" } },
           videoElement,
-          (result, err) => {
-            if (result && scannerRef.current) {
+          (result) => {
+            if (result && !processingRef.current && scannerRef.current) {
               const text = result.getText();
               if (text.startsWith("RONDE:")) {
+                processingRef.current = true;
                 const parts = text.split(":");
                 const pointId = parts[1];
                 const pointNom = parts.slice(2).join(":");
-                scannerRef.current = null; // bloque les appels suivants
-                setTimeout(async () => {
-                  arreterScanner();
-                  await scannerPoint(pointId, pointNom);
-                }, 200);
+                scannerRef.current = null;
+                arreterScanner();
+                scannerPoint(pointId, pointNom).finally(() => { processingRef.current = false; });
               }
             }
           }
@@ -1428,17 +1431,29 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
   };
 
   const arreterScanner = () => {
+    // Couper le flux caméra explicitement pour éteindre le voyant
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      videoRef.current.srcObject = null;
+    }
+    videoRef.current = null;
     if (scannerRef.current) {
-      try {
-        scannerRef.current.reset();
-      } catch {}
+      try { scannerRef.current.reset(); } catch {}
       scannerRef.current = null;
     }
     if (scannerDivRef.current) scannerDivRef.current.innerHTML = "";
     setScanning(false);
   };
 
-  // Simuler un scan manuel (pour les tests sans QR code physique)
+  // Cleanup caméra si le composant est démonté pendant un scan
+  useEffect(() => () => {
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+    }
+    if (scannerRef.current) { try { scannerRef.current.reset(); } catch {} }
+  }, []);
+
+  // Fallback manuel si le QR code est illisible ou absent
   const scanManuel = async (point: any) => {
     await scannerPoint(point.id, point.nom);
   };
@@ -1499,10 +1514,18 @@ const scannerDivRef = useRef<HTMLDivElement>(null);
                         {point.description && !estScanne && <p className="text-xs text-muted-foreground">{point.description}</p>}
                       </div>
                     </div>
-                   {!estScanne && (
-                      <Button size="sm" variant="outline" onClick={lancerScanner} className="text-xs gap-1">
-                        📷 Scanner
-                      </Button>
+                    {!estScanne && (
+                      <div className="flex flex-col gap-1 items-end">
+                        <Button size="sm" variant="outline" onClick={lancerScanner} className="text-xs gap-1">
+                          📷 Scanner
+                        </Button>
+                        <button
+                          onClick={() => scanManuel(point)}
+                          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                        >
+                          Marquer sans QR
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
