@@ -39,6 +39,13 @@ const STATUS_LABEL: Record<string, string> = {
   archive: "Archivé",
 };
 
+const CNAPS_BADGE: Record<string, { label: string; cls: string }> = {
+  vert:       { label: "CNAPS : Valide",      cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+  rouge:      { label: "CNAPS : Problème",    cls: "bg-red-500/10 text-red-400 border-red-500/30" },
+  a_verifier: { label: "CNAPS : À vérifier",  cls: "bg-orange-500/10 text-orange-400 border-orange-500/30" },
+  inconnu:    { label: "CNAPS : Non vérifié", cls: "bg-muted/50 text-muted-foreground border-border/50" },
+};
+
 const addMonths = (dateStr: string, months: number): string => {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -199,6 +206,7 @@ export default function Stagiaires() {
   if (selected) {
     const isArchived = selected.statut === "archive";
     const autoStatus = autorisationStatus(selected.autorisation_expiry);
+    const cnapsBadge = CNAPS_BADGE[selected.cnaps_statut ?? "inconnu"] ?? CNAPS_BADGE.inconnu;
 
     return (
       <div className="max-w-4xl mx-auto space-y-6">
@@ -334,27 +342,16 @@ export default function Stagiaires() {
                   <p>{selected.carte_pro_expiry ? new Date(selected.carte_pro_expiry).toLocaleDateString("fr-FR") : "—"}</p>
                 </div>
               </div>
-              {(() => {
-                const CNAPS_BADGE: Record<string, { label: string; cls: string }> = {
-                  vert:       { label: "CNAPS : Valide",      cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
-                  rouge:      { label: "CNAPS : Problème",    cls: "bg-red-500/10 text-red-400 border-red-500/30" },
-                  a_verifier: { label: "CNAPS : À vérifier",  cls: "bg-orange-500/10 text-orange-400 border-orange-500/30" },
-                  inconnu:    { label: "CNAPS : Non vérifié", cls: "bg-muted/50 text-muted-foreground border-border/50" },
-                };
-                const b = CNAPS_BADGE[selected.cnaps_statut ?? "inconnu"] ?? CNAPS_BADGE.inconnu;
-                return (
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded border text-xs ${b.cls}`}>
-                      {b.label}
-                    </span>
-                    {selected.cnaps_last_checked && (
-                      <span className="text-xs text-muted-foreground">
-                        vérifié le {new Date(selected.cnaps_last_checked).toLocaleDateString("fr-FR")}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
+              <div className="mt-3 flex items-center gap-2">
+                <Badge variant="outline" className={`text-xs ${cnapsBadge.cls}`}>
+                  {cnapsBadge.label}
+                </Badge>
+                {selected.cnaps_last_checked && (
+                  <span className="text-xs text-muted-foreground">
+                    vérifié le {new Date(selected.cnaps_last_checked).toLocaleDateString("fr-FR")}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </Card>

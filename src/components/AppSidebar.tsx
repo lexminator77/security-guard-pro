@@ -53,7 +53,7 @@ const allGroups: { label: string | null; items: NavItem[] }[] = [
       { title: "Incidents", url: "/incidents", icon: AlertTriangle, roles: ["administrateur","secretaire","formateur","agent"] },
       { title: "Facturation", url: "/facturation", icon: Receipt, roles: ["administrateur","secretaire"] },
       { title: "Financement OPCO", url: "/financement-opco", icon: Landmark, roles: ["administrateur","secretaire"] },
-      { title: "DRACAR", url: "/verification-cnaps", icon: ShieldCheck, roles: ["administrateur", "secretaire"] },
+      { title: "DRACAR", url: "/verification-cnaps", icon: ShieldCheck, roles: ["administrateur","secretaire"] },
     ],
   },
   {
