@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
   const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
   const CRON_SECRET = Deno.env.get("CRON_SECRET");
 
-  if (!SUPABASE_URL || !SERVICE_KEY) {
+  if (!SUPABASE_URL || !SERVICE_KEY || !ANON_KEY || !CRON_SECRET) {
     return new Response(JSON.stringify({ error: "Server misconfiguration" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -97,10 +97,18 @@ Deno.serve(async (req) => {
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY);
   const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-  const stagiaireIds: string[] | undefined = body.stagiaire_ids;
+  const stagiaireIds: string[] | undefined =
+    Array.isArray(body.stagiaire_ids) ? body.stagiaire_ids : undefined;
 
   let query = db.from("stagiaires").select("id, carte_pro_number").not("carte_pro_number", "is", null);
-  if (stagiaireIds?.length) query = (query as any).in("id", stagiaireIds);
+  if (stagiaireIds !== undefined) {
+    if (stagiaireIds.length === 0) {
+      return new Response(JSON.stringify({ ok: true, processed: 0, results: [] }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    query = (query as any).in("id", stagiaireIds);
+  }
   const { data: agents, error: fetchErr } = await query;
 
   if (fetchErr) {
@@ -115,12 +123,16 @@ Deno.serve(async (req) => {
   for (const agent of (agents ?? [])) {
     try {
       const { statut, result } = await verifyCarte(agent.carte_pro_number);
-      await db.from("stagiaires").update({
+      const { error: updateErr } = await db.from("stagiaires").update({
         cnaps_statut: statut,
         cnaps_last_checked: now,
         cnaps_last_result: result,
       }).eq("id", agent.id);
-      results.push({ id: agent.id, statut });
+      if (updateErr) {
+        results.push({ id: agent.id, statut: "a_verifier" });
+      } else {
+        results.push({ id: agent.id, statut });
+      }
     } catch (e: any) {
       results.push({ id: agent.id, statut: "a_verifier" });
     }
