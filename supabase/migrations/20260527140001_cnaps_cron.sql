@@ -3,7 +3,8 @@
 --   TON_PROJECT_REF  → your Supabase project reference (found in Settings → General)
 --   TON_CRON_SECRET  → the value of your CRON_SECRET environment variable
 
--- Active l'extension pg_net si pas encore active (nécessaire pour net.http_post)
+-- Active les extensions nécessaires
+CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- Supprime le job s'il existe déjà (idempotent)
@@ -21,8 +22,8 @@ SELECT cron.schedule(
   '0 3 1,15 * *',
   $$
     SELECT net.http_post(
-      url        := 'https://TON_PROJECT_REF.supabase.co/functions/v1/verify-cnaps',
-      headers    := '{"Content-Type": "application/json", "x-cron-secret": "TON_CRON_SECRET"}'::jsonb,
+      url        := 'https://gllkpaphipqwudnlntjw.supabase.co/functions/v1/verify-cnaps',
+      headers    := '{"Content-Type": "application/json", "x-cron-secret": "6a8be76a03f6965d21863f59d13767c0abe10c9d5daf0170ca3bce27463b4ea6"}'::jsonb,
       body       := '{}'::jsonb
     );
   $$
