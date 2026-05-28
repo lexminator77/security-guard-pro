@@ -52,7 +52,6 @@ const allGroups: { label: string; items: NavItem[] }[] = [
     label: "Conformité",
     items: [
       { title: "Cartes pro CNAPS",  url: "/verification-cnaps", icon: ShieldCheck,  roles: ["administrateur","secretaire"], alert: true },
-      { title: "Recyclages",        url: "/formations",         icon: RefreshCw,    roles: ["administrateur","secretaire"] },
       { title: "Qualiopi",           url: "/audit",              icon: ClipboardList, roles: ["administrateur"] },
       { title: "Incidents",         url: "/incidents",          icon: AlertTriangle, roles: ["administrateur","secretaire","formateur","agent"] },
     ],
