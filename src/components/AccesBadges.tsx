@@ -81,7 +81,7 @@ function TabVisiteurs({ ownerId, ownerField }: { ownerId: string; ownerField: st
       {form ? (
         <Card className="p-5 bg-card/60 border-border/50 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Enregistrer une entrée</h3>
+            <h3 className="font-semibold text-sm">Enregistrer une entrée visiteur / entreprise externe</h3>
             <button onClick={() => setForm(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -392,7 +392,7 @@ export function AccesBadges({ formateurId, stagiaireId }: { formateurId?: string
   const [tab, setTab] = useState<"visiteurs" | "cles" | "badges_employe">("visiteurs");
 
   const tabs = [
-    { id: "visiteurs" as const, label: "Visiteurs", icon: Users },
+    { id: "visiteurs" as const, label: "Visiteurs / Ext.", icon: Users },
     { id: "cles" as const, label: "Clés", icon: Key },
     { id: "badges_employe" as const, label: "Badges employés", icon: CreditCard },
   ];
