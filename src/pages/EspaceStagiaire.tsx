@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { SignatureModal } from "@/components/SignatureModal";
 import { PageMainCourante, ConsignesStagiaire, PermisFeuStagiaire, StatistiquesStagiaire, RondierStagiaire } from "@/components/MainCourante";
+import { AccesBadges } from "@/components/AccesBadges";
+import { CreditCard } from "lucide-react";
 import { CERT_LABELS, RECYCLAGE_TYPE, certStatusBadge, daysUntilExpiry } from "@/lib/certificationUtils";
 import type { Certification } from "@/types/certifications";const STATUS_COLOR: Record<string, string> = {
   valide: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -28,7 +30,7 @@ const STATUS_LABEL: Record<string, string> = {
   valide: "Validé", en_attente: "En attente", rejete: "Rejeté", archive: "Archivé",
 };
 
-type Page = "dashboard" | "formations" | "documents" | "cours" | "competences" | "emargement" | "profil" | "messagerie" | "maincourante_nouveau" | "maincourante_consulter" | "consignes" | "permisfeu" | "statistiques" | "rondier" | "parametres";
+type Page = "dashboard" | "formations" | "documents" | "cours" | "competences" | "emargement" | "profil" | "messagerie" | "maincourante_nouveau" | "maincourante_consulter" | "consignes" | "permisfeu" | "statistiques" | "rondier" | "acces_badges" | "parametres";
 function Messagerie({ messages, setMessages, stagiaireId }: {
   messages: any[];
   setMessages: (m: any[]) => void;
@@ -411,6 +413,11 @@ setUnreadFromFormateur(nonLus);
       <button onClick={() => { setPage("rondier"); setSidebarOpen(false); }}
         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${page === "rondier" ? "bg-primary/20 text-primary font-medium" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"}`}>
         <FileText className="h-4 w-4 flex-shrink-0" /> Rondier
+      </button>
+      {/* Accès & Badges */}
+      <button onClick={() => { setPage("acces_badges"); setSidebarOpen(false); }}
+        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${page === "acces_badges" ? "bg-primary/20 text-primary font-medium" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"}`}>
+        <CreditCard className="h-4 w-4 flex-shrink-0" /> Accès & Badges
       </button>
     </div>
   )}
@@ -851,6 +858,7 @@ setUnreadFromFormateur(nonLus);
     case "permisfeu": return <PermisFeuStagiaire stagiaireId={stagiaireId!} formations={formations} />; 
     case "statistiques": return <StatistiquesStagiaire stagiaireId={stagiaireId!} />;
     case "rondier": return <RondierStagiaire stagiaireId={stagiaireId!} />;
+    case "acces_badges": return <AccesBadges stagiaireId={stagiaireId!} />;
     case "maincourante_nouveau": return <PageMainCourante stagiaireId={stagiaireId!} formations={formations} vue="nouveau" />;
 case "maincourante_consulter": return <PageMainCourante stagiaireId={stagiaireId!} formations={formations} vue="consulter" />;
       case "profil": return <PageProfil />;

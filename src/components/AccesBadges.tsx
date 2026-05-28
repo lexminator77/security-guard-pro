@@ -17,7 +17,7 @@ function fmtDateHeure(ts: string) {
 
 // ─── Tab Visiteurs ────────────────────────────────────────────────────────────
 
-function TabVisiteurs({ formateurId }: { formateurId: string }) {
+function TabVisiteurs({ ownerId, ownerField }: { ownerId: string; ownerField: string }) {
   const [visiteurs, setVisiteurs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(false);
@@ -34,7 +34,7 @@ function TabVisiteurs({ formateurId }: { formateurId: string }) {
     const { data, error } = await supabase
       .from("registre_visiteurs")
       .select("*")
-      .eq("formateur_id", formateurId)
+      .eq(ownerField, ownerId)
       .order("heure_entree", { ascending: false })
       .limit(100);
     if (error) toast.error("Erreur chargement visiteurs");
@@ -42,13 +42,13 @@ function TabVisiteurs({ formateurId }: { formateurId: string }) {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [formateurId]);
+  useEffect(() => { load(); }, [ownerId]);
 
   const enregistrerEntree = async () => {
     if (!nom.trim() || !prenom.trim()) { toast.error("Nom et prénom obligatoires"); return; }
     setSaving(true);
     const { error } = await supabase.from("registre_visiteurs").insert({
-      formateur_id: formateurId,
+      [ownerField]: ownerId,
       nom: nom.trim(),
       prenom: prenom.trim(),
       entreprise: entreprise.trim() || null,
@@ -179,7 +179,7 @@ function TabVisiteurs({ formateurId }: { formateurId: string }) {
 
 type InventaireType = "cle" | "badge_visiteur" | "badge_employe";
 
-function TabInventaire({ formateurId, type }: { formateurId: string; type: InventaireType }) {
+function TabInventaire({ ownerId, ownerField, type }: { ownerId: string; ownerField: string; type: InventaireType }) {
   const isCle = type === "cle";
   const table = isCle ? "inventaire_cles" : "inventaire_badges";
   const badgeType = type === "badge_visiteur" ? "visiteur" : "employe";
@@ -195,7 +195,7 @@ function TabInventaire({ formateurId, type }: { formateurId: string; type: Inven
 
   const load = async () => {
     setLoading(true);
-    let q = supabase.from(table).select("*").eq("formateur_id", formateurId);
+    let q = supabase.from(table).select("*").eq(ownerField, ownerId);
     if (!isCle) q = q.eq("type", badgeType);
     const { data, error } = await q.order("created_at", { ascending: false });
     if (error) toast.error("Erreur chargement");
@@ -203,12 +203,12 @@ function TabInventaire({ formateurId, type }: { formateurId: string; type: Inven
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [formateurId, type]);
+  useEffect(() => { load(); }, [ownerId, type]);
 
   const ajouter = async () => {
     if (!numero.trim() || !designation.trim()) { toast.error("Numéro et désignation obligatoires"); return; }
     setSaving(true);
-    const payload: any = { formateur_id: formateurId, numero: numero.trim(), designation: designation.trim() };
+    const payload: any = { [ownerField]: ownerId, numero: numero.trim(), designation: designation.trim() };
     if (!isCle) payload.type = badgeType;
     const { error } = await supabase.from(table).insert(payload);
     if (error) { toast.error(error.message); setSaving(false); return; }
@@ -385,7 +385,10 @@ function TabInventaire({ formateurId, type }: { formateurId: string; type: Inven
 
 // ─── Export principal ─────────────────────────────────────────────────────────
 
-export function AccesBadges({ formateurId }: { formateurId: string }) {
+export function AccesBadges({ formateurId, stagiaireId }: { formateurId?: string; stagiaireId?: string }) {
+  const ownerId = formateurId ?? stagiaireId ?? "";
+  const ownerField = formateurId ? "formateur_id" : "stagiaire_id";
+
   const [tab, setTab] = useState<"visiteurs" | "cles" | "badges_visiteur" | "badges_employe">("visiteurs");
 
   const tabs = [
@@ -411,10 +414,10 @@ export function AccesBadges({ formateurId }: { formateurId: string }) {
         ))}
       </div>
 
-      {tab === "visiteurs" && <TabVisiteurs formateurId={formateurId} />}
-      {tab === "cles" && <TabInventaire formateurId={formateurId} type="cle" />}
-      {tab === "badges_visiteur" && <TabInventaire formateurId={formateurId} type="badge_visiteur" />}
-      {tab === "badges_employe" && <TabInventaire formateurId={formateurId} type="badge_employe" />}
+      {tab === "visiteurs" && <TabVisiteurs ownerId={ownerId} ownerField={ownerField} />}
+      {tab === "cles" && <TabInventaire ownerId={ownerId} ownerField={ownerField} type="cle" />}
+      {tab === "badges_visiteur" && <TabInventaire ownerId={ownerId} ownerField={ownerField} type="badge_visiteur" />}
+      {tab === "badges_employe" && <TabInventaire ownerId={ownerId} ownerField={ownerField} type="badge_employe" />}
     </div>
   );
 }
