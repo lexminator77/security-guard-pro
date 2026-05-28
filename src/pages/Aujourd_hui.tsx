@@ -373,7 +373,7 @@ function IAPanel({ absents }: { absents: string[] }) {
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <Sparkles className="h-[15px] w-[15px] text-primary" />
-        <h3 className="text-[13px] font-semibold tracking-tight">Assistant IA</h3>
+        <h3 className="text-[13px] font-semibold tracking-tight">Rappels & Suggestions</h3>
         <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
           {suggestions.length} suggestions
         </span>
