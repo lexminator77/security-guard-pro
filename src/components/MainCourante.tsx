@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { FiltreDateRange, FiltreDateValue, appliquerFiltreDateRange } from "./FiltreDateRange";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const FAMILLES = [
   "ACCIDENT", "ALERTE", "INCIDENT TECHNIQUE", "INCIDENTS SURETE",
@@ -1053,10 +1054,16 @@ export function PermisFeuFormateur() {
 
 // ─── Statistiques ────────────────────────────────────────────────────────────
 
+const CHART_COLORS = ["#6366f1","#8b5cf6","#ec4899","#f97316","#eab308","#22c55e","#14b8a6","#3b82f6","#a855f7","#f43f5e"];
+const SEV_COLORS: Record<string, string> = { "Sans conséquence": "#22c55e", "Blessure légère": "#eab308", "Blessure grave": "#f97316", "Décès": "#ef4444" };
+const CHART_TOOLTIP_STYLE = { background: "#1e293b", border: "1px solid #334155", borderRadius: 8, fontSize: 12, color: "#f1f5f9" };
+
 export function StatistiquesStagiaire({ stagiaireId }: { stagiaireId: string }) {
   const [fiches, setFiches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [periode, setPeriode] = useState<"semaine" | "mois" | "tout">("mois");
+  const [showRapport, setShowRapport] = useState(false);
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -1075,34 +1082,42 @@ export function StatistiquesStagiaire({ stagiaireId }: { stagiaireId: string }) 
     return true;
   });
 
-  // Stats par famille
-  const statsFamille = fichesFiltrees.reduce((acc: any, f) => {
-    acc[f.famille] = (acc[f.famille] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  // Stats par type
-  const statsType = fichesFiltrees.reduce((acc: any, f) => {
-    acc[f.type_evenement] = (acc[f.type_evenement] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  // Stats par sévérité physique
-  const statsSev = fichesFiltrees.reduce((acc: any, f) => {
-    acc[f.severite_physique] = (acc[f.severite_physique] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const topTypes = Object.entries(statsType).sort(([,a]: any, [,b]: any) => b - a).slice(0, 5);
   const total = fichesFiltrees.length;
+  const avecVictime = fichesFiltrees.filter(f => f.victime && f.victime !== "Pas de victime").length;
 
-  const maxFamille = Math.max(...Object.values(statsFamille) as number[], 1);
+  const statsFamille: Record<string, number> = fichesFiltrees.reduce((acc: any, f) => { acc[f.famille] = (acc[f.famille] ?? 0) + 1; return acc; }, {});
+  const statsType: Record<string, number> = fichesFiltrees.reduce((acc: any, f) => { acc[f.type_evenement] = (acc[f.type_evenement] ?? 0) + 1; return acc; }, {});
+  const statsSev: Record<string, number> = fichesFiltrees.reduce((acc: any, f) => { if (f.severite_physique) { acc[f.severite_physique] = (acc[f.severite_physique] ?? 0) + 1; } return acc; }, {});
+
+  const familleData = Object.entries(statsFamille).sort(([,a],[,b]) => b - a).map(([name, value]) => ({ name, value }));
+  const topEventsData = Object.entries(statsType).sort(([,a],[,b]) => b - a).slice(0, 8).map(([name, value]) => ({ name, value }));
+
+  const timelineData = (() => {
+    const grouped: Record<string, number> = {};
+    [...fichesFiltrees].reverse().forEach(f => {
+      const d = new Date(f.created_at);
+      const key = periode === "tout"
+        ? `${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+        : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+      grouped[key] = (grouped[key] ?? 0) + 1;
+    });
+    return Object.entries(grouped).map(([date, count]) => ({ date, count }));
+  })();
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Statistiques</h1>
-        <p className="text-muted-foreground text-sm mt-1">Analyse de vos mains courantes</p>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Statistiques</h1>
+          <p className="text-muted-foreground text-sm mt-1">Analyse de vos mains courantes</p>
+        </div>
+        {!loading && total > 0 && (
+          <Button size="sm" onClick={() => setShowRapport(v => !v)}
+            className={showRapport ? "bg-muted/60 hover:bg-muted/80 text-foreground" : "bg-primary hover:bg-primary/90"}>
+            {showRapport ? "Masquer" : "Voir le rapport"}
+          </Button>
+        )}
       </div>
 
       {/* Filtre période */}
@@ -1117,76 +1132,118 @@ export function StatistiquesStagiaire({ stagiaireId }: { stagiaireId: string }) 
 
       {loading ? <p className="text-muted-foreground text-sm text-center py-8">Chargement…</p> : (
         <>
-          {/* Total */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* KPI */}
+          <div className="grid grid-cols-2 gap-3">
             <Card className="p-5 bg-card/60 border-border/50 text-center">
-              <p className="text-3xl font-bold text-primary">{total}</p>
+              <p className="text-4xl font-bold text-primary">{total}</p>
               <p className="text-xs text-muted-foreground mt-1">Fiches totales</p>
             </Card>
             <Card className="p-5 bg-card/60 border-border/50 text-center">
-              <p className="text-3xl font-bold text-primary">{Object.keys(statsFamille).length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Familles différentes</p>
+              <p className="text-4xl font-bold text-amber-400">{avecVictime}</p>
+              <p className="text-xs text-muted-foreground mt-1">Avec victime</p>
             </Card>
             <Card className="p-5 bg-card/60 border-border/50 text-center">
-              <p className="text-3xl font-bold text-primary">{fichesFiltrees.filter(f => f.victime !== "Pas de victime").length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Avec victimes</p>
+              <p className="text-4xl font-bold text-violet-400">{Object.keys(statsFamille).length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Familles touchées</p>
+            </Card>
+            <Card className="p-5 bg-card/60 border-border/50 text-center">
+              <p className="text-4xl font-bold text-emerald-400">{Object.keys(statsType).length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Types d'événements</p>
             </Card>
           </div>
-
-          {/* Stats par famille */}
-          {Object.keys(statsFamille).length > 0 && (
-            <Card className="p-6 bg-card/60 border-border/50 space-y-4">
-              <h2 className="font-semibold text-sm">Répartition par famille</h2>
-              <div className="space-y-3">
-                {Object.entries(statsFamille).sort(([,a]: any, [,b]: any) => b - a).map(([famille, count]: any) => (
-                  <div key={famille} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{famille}</span>
-                      <span className="font-medium text-primary">{count}</span>
-                    </div>
-                    <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
-                      <div className="h-full bg-primary/60 rounded-full transition-all" style={{ width: `${(count / maxFamille) * 100}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Top événements */}
-          {topTypes.length > 0 && (
-            <Card className="p-6 bg-card/60 border-border/50 space-y-3">
-              <h2 className="font-semibold text-sm">Top 5 des événements</h2>
-              <div className="space-y-2">
-                {topTypes.map(([type, count]: any, i) => (
-                  <div key={type} className="flex items-center gap-3 p-3 rounded-lg bg-muted/20 border border-border/30">
-                    <span className="text-xs font-bold text-primary w-5">{i + 1}</span>
-                    <span className="text-sm flex-1">{type}</span>
-                    <Badge variant="outline" className="border-primary/40 text-primary text-xs">{count}</Badge>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Sévérités */}
-          {Object.keys(statsSev).length > 0 && (
-            <Card className="p-6 bg-card/60 border-border/50 space-y-3">
-              <h2 className="font-semibold text-sm">Sévérités physiques</h2>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(statsSev).map(([sev, count]: any) => (
-                  <div key={sev} className={`px-3 py-2 rounded-lg border text-xs font-medium ${sev === "Sans conséquence" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" : sev.includes("grave") ? "border-red-500/40 bg-red-500/10 text-red-400" : "border-yellow-500/40 bg-yellow-500/10 text-yellow-400"}`}>
-                    {sev} ({count})
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
 
           {total === 0 && (
             <Card className="p-12 text-center border-dashed">
               <p className="text-muted-foreground text-sm">Aucune fiche sur cette période</p>
             </Card>
+          )}
+
+          {/* Rapport complet */}
+          {showRapport && total > 0 && (
+            <div className="space-y-6">
+
+              {/* Timeline activité */}
+              {timelineData.length > 0 && (
+                <Card className="p-6 bg-card/60 border-border/50 space-y-4">
+                  <h2 className="font-semibold text-sm">Activité {periode === "tout" ? "par mois" : "par jour"}</h2>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={timelineData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={CHART_TOOLTIP_STYLE} cursor={{ fill: "rgba(99,102,241,0.08)" }} formatter={(v: any) => [v, "fiches"]} />
+                      <Bar dataKey="count" name="Fiches" fill="#6366f1" radius={[4,4,0,0]} maxBarSize={40} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Card>
+              )}
+
+              {/* Donut famille */}
+              {familleData.length > 0 && (
+                <Card className="p-6 bg-card/60 border-border/50 space-y-4">
+                  <h2 className="font-semibold text-sm">Répartition par famille</h2>
+                  <div className="flex items-center gap-6">
+                    <div className="flex-shrink-0">
+                      <ResponsiveContainer width={150} height={150}>
+                        <PieChart>
+                          <Pie data={familleData} cx="50%" cy="50%" innerRadius={42} outerRadius={68} paddingAngle={2} dataKey="value" strokeWidth={0}>
+                            {familleData.map((_: any, i: number) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex-1 space-y-2 min-w-0">
+                      {familleData.map((entry: any, i: number) => (
+                        <div key={entry.name} className="flex items-center gap-2 text-xs min-w-0">
+                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                          <span className="text-muted-foreground truncate flex-1">{entry.name}</span>
+                          <span className="font-semibold tabular-nums">{entry.value}</span>
+                          <span className="text-muted-foreground tabular-nums">({Math.round(entry.value / total * 100)}%)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Top événements — barres horizontales */}
+              {topEventsData.length > 0 && (
+                <Card className="p-6 bg-card/60 border-border/50 space-y-4">
+                  <h2 className="font-semibold text-sm">Top {topEventsData.length} événements</h2>
+                  <ResponsiveContainer width="100%" height={topEventsData.length * 38 + 8}>
+                    <BarChart data={topEventsData} layout="vertical" margin={{ top: 0, right: 32, left: 0, bottom: 0 }}>
+                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                      <YAxis type="category" dataKey="name" width={148} tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false}
+                        tickFormatter={(v: string) => v.length > 22 ? v.slice(0, 21) + "…" : v} />
+                      <Tooltip contentStyle={CHART_TOOLTIP_STYLE} cursor={{ fill: "rgba(139,92,246,0.08)" }} formatter={(v: any) => [v, "fiches"]} />
+                      <Bar dataKey="value" name="Fiches" fill="#8b5cf6" radius={[0,4,4,0]} maxBarSize={24} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Card>
+              )}
+
+              {/* Sévérités */}
+              {Object.keys(statsSev).length > 0 && (
+                <Card className="p-6 bg-card/60 border-border/50 space-y-4">
+                  <h2 className="font-semibold text-sm">Sévérités physiques</h2>
+                  <div className="space-y-3">
+                    {Object.entries(statsSev).sort(([,a],[,b]) => b - a).map(([sev, count]) => (
+                      <div key={sev} className="flex items-center gap-3">
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: SEV_COLORS[sev] ?? "#94a3b8" }} />
+                        <span className="text-sm flex-1 text-muted-foreground">{sev}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-24 bg-muted/30 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${(count / total) * 100}%`, background: SEV_COLORS[sev] ?? "#94a3b8" }} />
+                          </div>
+                          <span className="text-xs font-semibold tabular-nums w-6 text-right">{count}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+            </div>
           )}
         </>
       )}
