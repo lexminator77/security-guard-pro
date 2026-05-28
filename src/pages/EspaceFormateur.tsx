@@ -626,32 +626,47 @@ export default function EspaceFormateur() {
     };
 
     const loadStagiaires = async () => {
-      if (!authUserId) return;
+      if (!authUserId || !formateurId) return;
       setLoading(true);
 
-      const { data: participants } = await supabase
+      const { data: participants, error: errParticipants } = await supabase
         .from("formation_participants")
         .select("stagiaire_id, formations!inner(formateur_id)")
         .eq("formations.formateur_id", formateurId);
+      if (errParticipants) {
+        toast.error("Erreur lors du chargement des formations");
+        setLoading(false);
+        return;
+      }
 
       const idsFromForms: string[] = (participants ?? []).map((p: any) => p.stagiaire_id);
 
-      const { data: bySelf } = await supabase
+      const { data: bySelf, error: errBySelf } = await supabase
         .from("stagiaires")
         .select("*")
         .eq("created_by", authUserId)
         .is("deleted_at", null);
+      if (errBySelf) {
+        toast.error("Erreur lors du chargement des stagiaires");
+        setLoading(false);
+        return;
+      }
 
       const selfIds = new Set((bySelf ?? []).map((s: any) => s.id));
       const extraIds = idsFromForms.filter(id => !selfIds.has(id));
 
       let byForms: any[] = [];
       if (extraIds.length > 0) {
-        const { data } = await supabase
+        const { data, error: errByForms } = await supabase
           .from("stagiaires")
           .select("*")
           .in("id", extraIds)
           .is("deleted_at", null);
+        if (errByForms) {
+          toast.error("Erreur lors du chargement des stagiaires inscrits");
+          setLoading(false);
+          return;
+        }
         byForms = data ?? [];
       }
 
