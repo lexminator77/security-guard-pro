@@ -389,12 +389,11 @@ export function AccesBadges({ formateurId, stagiaireId }: { formateurId?: string
   const ownerId = formateurId ?? stagiaireId ?? "";
   const ownerField = formateurId ? "formateur_id" : "stagiaire_id";
 
-  const [tab, setTab] = useState<"visiteurs" | "cles" | "badges_visiteur" | "badges_employe">("visiteurs");
+  const [tab, setTab] = useState<"visiteurs" | "cles" | "badges_employe">("visiteurs");
 
   const tabs = [
     { id: "visiteurs" as const, label: "Visiteurs", icon: Users },
     { id: "cles" as const, label: "Clés", icon: Key },
-    { id: "badges_visiteur" as const, label: "Badges visiteurs", icon: CreditCard },
     { id: "badges_employe" as const, label: "Badges employés", icon: CreditCard },
   ];
 
@@ -416,7 +415,6 @@ export function AccesBadges({ formateurId, stagiaireId }: { formateurId?: string
 
       {tab === "visiteurs" && <TabVisiteurs ownerId={ownerId} ownerField={ownerField} />}
       {tab === "cles" && <TabInventaire ownerId={ownerId} ownerField={ownerField} type="cle" />}
-      {tab === "badges_visiteur" && <TabInventaire ownerId={ownerId} ownerField={ownerField} type="badge_visiteur" />}
       {tab === "badges_employe" && <TabInventaire ownerId={ownerId} ownerField={ownerField} type="badge_employe" />}
     </div>
   );
