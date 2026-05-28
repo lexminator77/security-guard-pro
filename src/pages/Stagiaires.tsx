@@ -157,24 +157,38 @@ export default function Stagiaires() {
 
   const loadCorbeille = async () => {
     setLoadingCorbeille(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("stagiaires")
-      .select("*, deleted_by_profile:deleted_by(email)")
+      .select("*")
       .not("deleted_at", "is", null)
       .order("deleted_at", { ascending: false });
-    setCorbeille(data ?? []);
+    if (error) { toast.error("Erreur chargement corbeille"); setLoadingCorbeille(false); return; }
+    const userIds = [...new Set((data ?? []).map((s: any) => s.deleted_by).filter(Boolean))];
+    let emailMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("id, email").in("id", userIds);
+      (profs ?? []).forEach((p: any) => { emailMap[p.id] = p.email; });
+    }
+    setCorbeille((data ?? []).map((s: any) => ({ ...s, deleted_by_email: s.deleted_by ? emailMap[s.deleted_by] : null })));
     setLoadingCorbeille(false);
   };
 
   const loadAudit = async () => {
     setLoadingAudit(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("audit_log")
-      .select("*, user:user_id(email)")
+      .select("*")
       .eq("table_name", "stagiaires")
       .order("created_at", { ascending: false })
       .limit(100);
-    setAuditLog(data ?? []);
+    if (error) { toast.error("Erreur chargement activité"); setLoadingAudit(false); return; }
+    const userIds = [...new Set((data ?? []).map((l: any) => l.user_id).filter(Boolean))];
+    let emailMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("id, email").in("id", userIds);
+      (profs ?? []).forEach((p: any) => { emailMap[p.id] = p.email; });
+    }
+    setAuditLog((data ?? []).map((l: any) => ({ ...l, user_email: l.user_id ? emailMap[l.user_id] : null })));
     setLoadingAudit(false);
   };
 
@@ -669,7 +683,7 @@ export default function Stagiaires() {
                     <p className="font-medium text-sm">{s.last_name?.toUpperCase()} {s.first_name}</p>
                     <p className="text-xs text-muted-foreground">
                       Archivé le {new Date(s.deleted_at).toLocaleDateString("fr-FR")}
-                      {s.deleted_by_profile?.email && ` par ${s.deleted_by_profile.email}`}
+                      {s.deleted_by_email && ` par ${s.deleted_by_email}`}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -722,12 +736,12 @@ export default function Stagiaires() {
                   <div key={log.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/30 transition-colors">
                     <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                       <span className="text-[10px] font-bold text-primary">
-                        {log.user?.email?.[0]?.toUpperCase() ?? "?"}
+                        {log.user_email?.[0]?.toUpperCase() ?? "?"}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm">
-                        <span className="font-medium">{log.user?.email ?? "Utilisateur inconnu"}</span>
+                        <span className="font-medium">{log.user_email ?? "Utilisateur inconnu"}</span>
                         {" "}
                         <span className={actionColor[log.action] ?? "text-foreground"}>{actionLabel[log.action] ?? log.action}</span>
                         {" "}

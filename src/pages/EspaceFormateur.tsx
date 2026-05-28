@@ -99,6 +99,357 @@ function MessagerieChat({ stagiaireId, stagiaireNom, formationId, formationNom, 
   );
 }
 
+function PageStagiairesFormateur({ authUserId, formateurId, formations }: { authUserId: string | null; formateurId: string | null; formations: any[] }) {
+  const [stagiaires, setStagiaires] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [inscriptionOpen, setInscriptionOpen] = useState(false);
+  const [newStagiaireId, setNewStagiaireId] = useState<string | null>(null);
+  const [selectedFormationId, setSelectedFormationId] = useState("");
+  const [form, setForm] = useState({
+    first_name: "", last_name: "", birth_date: "",
+    email: "", phone: "", address: "", city: "", postal_code: "", notes: "",
+  });
+
+  const emptyForm = {
+    first_name: "", last_name: "", birth_date: "",
+    email: "", phone: "", address: "", city: "", postal_code: "", notes: "",
+  };
+
+  const loadStagiaires = async () => {
+    if (!authUserId || !formateurId) return;
+    setLoading(true);
+
+    const { data: participants, error: errParticipants } = await supabase
+      .from("formation_participants")
+      .select("stagiaire_id, formations!inner(formateur_id)")
+      .eq("formations.formateur_id", formateurId);
+    if (errParticipants) {
+      toast.error("Erreur lors du chargement des formations");
+      setLoading(false);
+      return;
+    }
+
+    const idsFromForms: string[] = (participants ?? []).map((p: any) => p.stagiaire_id);
+
+    const { data: bySelf, error: errBySelf } = await supabase
+      .from("stagiaires")
+      .select("*")
+      .eq("created_by", authUserId)
+      .is("deleted_at", null);
+    if (errBySelf) {
+      toast.error("Erreur lors du chargement des stagiaires");
+      setLoading(false);
+      return;
+    }
+
+    const selfIds = new Set((bySelf ?? []).map((s: any) => s.id));
+    const extraIds = idsFromForms.filter(id => !selfIds.has(id));
+
+    let byForms: any[] = [];
+    if (extraIds.length > 0) {
+      const { data, error: errByForms } = await supabase
+        .from("stagiaires")
+        .select("*")
+        .in("id", extraIds)
+        .is("deleted_at", null);
+      if (errByForms) {
+        toast.error("Erreur lors du chargement des stagiaires inscrits");
+        setLoading(false);
+        return;
+      }
+      byForms = data ?? [];
+    }
+
+    setStagiaires([...(bySelf ?? []), ...byForms]);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadStagiaires(); }, [authUserId, formateurId]);
+
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+
+  const openEdit = (s: any) => {
+    setEditing(s);
+    setForm({
+      first_name: s.first_name ?? "", last_name: s.last_name ?? "", birth_date: s.birth_date ?? "",
+      email: s.email ?? "", phone: s.phone ?? "", address: s.address ?? "",
+      city: s.city ?? "", postal_code: s.postal_code ?? "", notes: s.notes ?? "",
+    });
+    setDialogOpen(true);
+  };
+
+  const submit = async () => {
+    if (!form.first_name.trim() || !form.last_name.trim() || !form.birth_date) {
+      toast.error("Prénom, nom et date de naissance sont obligatoires");
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const organismeId = "00000000-0000-0000-0000-000000000001";
+
+    if (editing) {
+      const { error } = await supabase.from("stagiaires").update({
+        ...form, birth_date: form.birth_date || null, updated_at: new Date().toISOString(),
+      }).eq("id", editing.id);
+      if (error) { toast.error(error.message); return; }
+      await supabase.from("audit_log").insert({
+        organisme_id: organismeId, user_id: user!.id, user_role: "formateur",
+        action: "update", table_name: "stagiaires", record_id: editing.id, payload: form,
+      });
+      toast.success("Stagiaire mis à jour");
+    } else {
+      const { data: created, error } = await supabase.from("stagiaires").insert({
+        ...form, birth_date: form.birth_date || null, created_by: user!.id,
+        organisme_id: organismeId, statut: "actif",
+      }).select().single();
+      if (error) { toast.error(error.message); return; }
+      await supabase.from("audit_log").insert({
+        organisme_id: organismeId, user_id: user!.id, user_role: "formateur",
+        action: "create", table_name: "stagiaires", record_id: created.id, payload: form,
+      });
+      toast.success("Stagiaire créé");
+      setNewStagiaireId(created.id);
+      setSelectedFormationId("");
+      setInscriptionOpen(true);
+    }
+    setDialogOpen(false);
+    loadStagiaires();
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    const organismeId = "00000000-0000-0000-0000-000000000001";
+    const { error } = await supabase.from("stagiaires").update({
+      deleted_at: new Date().toISOString(), deleted_by: user!.id,
+    }).eq("id", deleteTarget.id);
+    if (error) { toast.error(error.message); return; }
+    await supabase.from("audit_log").insert({
+      organisme_id: organismeId, user_id: user!.id, user_role: "formateur",
+      action: "delete", table_name: "stagiaires", record_id: deleteTarget.id,
+      payload: { first_name: deleteTarget.first_name, last_name: deleteTarget.last_name },
+    });
+    toast.success("Stagiaire archivé");
+    setDeleteTarget(null);
+    loadStagiaires();
+  };
+
+  const inscrire = async () => {
+    if (!newStagiaireId || !selectedFormationId) return;
+    const { error } = await supabase.from("formation_participants").insert({
+      stagiaire_id: newStagiaireId, formation_id: selectedFormationId,
+      organisme_id: "00000000-0000-0000-0000-000000000001",
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Stagiaire inscrit à la formation");
+    setInscriptionOpen(false);
+    loadStagiaires();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-display font-bold">Mes stagiaires</h1>
+        <Button size="sm" className="gap-1.5" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5" /> Nouveau stagiaire
+        </Button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground text-center py-8">Chargement…</p>
+      ) : stagiaires.length === 0 ? (
+        <Card className="p-12 text-center text-muted-foreground text-sm border-dashed">
+          Aucun stagiaire — cliquez sur "Nouveau stagiaire" pour commencer
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {stagiaires.map(s => (
+            <Card key={s.id} className="p-4 border-border/50 bg-card/60">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-bold text-primary">{s.first_name?.[0]}{s.last_name?.[0]}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm">{s.last_name.toUpperCase()} {s.first_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {s.birth_date && new Date(s.birth_date).toLocaleDateString("fr-FR")}
+                      {s.city && ` · ${s.city}`}
+                      {s.email && ` · ${s.email}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(s)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive/70 hover:text-destructive" onClick={() => setDeleteTarget(s)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Modifier le stagiaire" : "Nouveau stagiaire"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Prénom *</Label><Input value={form.first_name} onChange={e => setForm({...form, first_name: e.target.value})} /></div>
+              <div><Label>Nom *</Label><Input value={form.last_name} onChange={e => setForm({...form, last_name: e.target.value})} /></div>
+            </div>
+            <div><Label>Date de naissance *</Label><Input type="date" value={form.birth_date} onChange={e => setForm({...form, birth_date: e.target.value})} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
+              <div><Label>Téléphone</Label><Input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
+            </div>
+            <div><Label>Adresse</Label><Input value={form.address} onChange={e => setForm({...form, address: e.target.value})} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Ville</Label><Input value={form.city} onChange={e => setForm({...form, city: e.target.value})} /></div>
+              <div><Label>Code postal</Label><Input value={form.postal_code} onChange={e => setForm({...form, postal_code: e.target.value})} /></div>
+            </div>
+            <div><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={2} className="resize-none" /></div>
+            <Button className="w-full gradient-primary text-primary-foreground" onClick={submit}>
+              {editing ? "Enregistrer" : "Créer le stagiaire"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle>Archiver ce stagiaire ?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            <b>{deleteTarget?.first_name} {deleteTarget?.last_name}</b> sera archivé.
+            L'administrateur pourra le restaurer si besoin. Cette action n'est pas définitive.
+          </p>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>Annuler</Button>
+            <Button variant="destructive" className="flex-1" onClick={confirmDelete}>Archiver</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inscriptionOpen} onOpenChange={setInscriptionOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader><DialogTitle>Inscrire à une formation ?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground mb-3">
+            Stagiaire créé. Voulez-vous l'inscrire directement dans une de vos formations ?
+          </p>
+          <Select value={selectedFormationId} onValueChange={setSelectedFormationId}>
+            <SelectTrigger><SelectValue placeholder="Choisir une formation" /></SelectTrigger>
+            <SelectContent>
+              {formations.map((f: any) => (
+                <SelectItem key={f.id} value={f.id}>{f.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex gap-2 mt-3">
+            <Button variant="outline" className="flex-1" onClick={() => setInscriptionOpen(false)}>Passer</Button>
+            <Button className="flex-1 gradient-primary text-primary-foreground" onClick={inscrire} disabled={!selectedFormationId}>
+              Inscrire
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function PageCours({ formateurId }: { formateurId: string | null }) {
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [cours, setCours] = useState<any[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!formateurId) return;
+    Promise.all([
+      supabase.from("formation_templates").select("*").eq("is_pack", false).order("code"),
+      supabase.from("cours").select("*").order("chapitre_numero", { ascending: true }),
+      supabase.from("formations").select("type, template_code").eq("formateur_id", formateurId),
+      supabase.from("formateurs").select("cours_autorises").eq("id", formateurId).single(),
+    ]).then(([{ data: tpl }, { data: cr }, { data: forms }, { data: fmt }]) => {
+      const autoTypes = new Set<string>((forms ?? []).flatMap(f => [f.template_code, f.type].filter(Boolean)));
+      const manual: string[] = fmt?.cours_autorises ?? [];
+      manual.forEach(c => autoTypes.add(c));
+      if (tpl) setTemplates(tpl.filter(t => autoTypes.has(t.code)));
+      if (cr) setCours(cr);
+    });
+  }, [formateurId]);
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-display font-bold">Cours & contenus pédagogiques</h1>
+      <div className="space-y-3">
+        {templates.map(t => {
+          const chs = cours.filter(c => c.formation_type === t.code);
+          const isOpen = expanded === t.code;
+          return (
+            <Card key={t.code} className="border-border/50 bg-card/60 overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/20 transition-colors"
+                onClick={() => setExpanded(isOpen ? null : t.code)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm">{t.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t.duration_hours > 0 ? `${t.duration_hours}h` : "Durée variable"}
+                      {chs.length > 0 && ` · ${chs.length} chapitre${chs.length > 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`} />
+              </button>
+              {isOpen && (
+                <div className="border-t border-border/50">
+                  {t.description && (
+                    <div className="px-4 py-3 bg-muted/20 border-b border-border/30">
+                      <p className="text-sm text-muted-foreground">{t.description}</p>
+                    </div>
+                  )}
+                  {chs.length === 0 ? (
+                    <p className="px-4 py-6 text-sm text-muted-foreground text-center">Aucun contenu pédagogique disponible</p>
+                  ) : (
+                    <div className="divide-y divide-border/30">
+                      {chs.map((ch, i) => (
+                        <div key={ch.id} className="px-4 py-3 flex gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold mt-0.5">
+                            {ch.chapitre_numero ?? i + 1}
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium">{ch.titre}</p>
+                            {ch.contenu && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ch.contenu}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+        {templates.length === 0 && (
+          <Card className="p-12 text-center text-muted-foreground text-sm border-dashed">
+            Aucun cours disponible
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function EspaceFormateur() {
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -128,22 +479,25 @@ export default function EspaceFormateur() {
   const [msgFormation, setMsgFormation] = useState<any>(null);
   const [sigModal, setSigModal] = useState<{ formationId: string; periode: "matin" | "apres_midi" } | null>(null);
 
-  useEffect(() => { document.title = "Espace formateur — SecureCRM"; init(); }, []);
-
-  const init = async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setErreur("Non connecté"); setLoading(false); return; }
-    const { data: fiche, error } = await supabase.from("formateurs").select("*").eq("email", user.email).single();
-    if (error || !fiche) { setErreur("Aucune fiche formateur trouvée pour ce compte. Contactez l'administrateur."); setLoading(false); return; }
-    setFormateur(fiche);
-    setFormateurId(fiche.id);
-    setAuthUserId(user.id);
-    setLoading(false);
-    loadAll(fiche.id);
-    const interval = setInterval(() => loadAll(fiche.id), 10000);
-    return () => clearInterval(interval);
-  };
+  useEffect(() => {
+    document.title = "Espace formateur — SecureCRM";
+    let intervalId: ReturnType<typeof setInterval>;
+    const run = async () => {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setErreur("Non connecté"); setLoading(false); return; }
+      const { data: fiche, error } = await supabase.from("formateurs").select("*").eq("email", user.email).single();
+      if (error || !fiche) { setErreur("Aucune fiche formateur trouvée pour ce compte. Contactez l'administrateur."); setLoading(false); return; }
+      setFormateur(fiche);
+      setFormateurId(fiche.id);
+      setAuthUserId(user.id);
+      setLoading(false);
+      loadAll(fiche.id);
+      intervalId = setInterval(() => loadAll(fiche.id), 10000);
+    };
+    run();
+    return () => clearInterval(intervalId);
+  }, []);
 
   const loadAll = async (fid: string) => {
     const [{ data: p }, { data: form }, { data: em }] = await Promise.all([
@@ -606,423 +960,6 @@ export default function EspaceFormateur() {
     </div>
   );
 
-  const PageStagiairesFormateur = () => {
-    const [stagiaires, setStagiaires] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [editing, setEditing] = useState<any | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
-    const [inscriptionOpen, setInscriptionOpen] = useState(false);
-    const [newStagiaireId, setNewStagiaireId] = useState<string | null>(null);
-    const [selectedFormationId, setSelectedFormationId] = useState("");
-    const [form, setForm] = useState({
-      first_name: "", last_name: "", birth_date: "",
-      email: "", phone: "", address: "", city: "", postal_code: "", notes: "",
-    });
-
-    const emptyForm = {
-      first_name: "", last_name: "", birth_date: "",
-      email: "", phone: "", address: "", city: "", postal_code: "", notes: "",
-    };
-
-    const loadStagiaires = async () => {
-      if (!authUserId || !formateurId) return;
-      setLoading(true);
-
-      const { data: participants, error: errParticipants } = await supabase
-        .from("formation_participants")
-        .select("stagiaire_id, formations!inner(formateur_id)")
-        .eq("formations.formateur_id", formateurId);
-      if (errParticipants) {
-        toast.error("Erreur lors du chargement des formations");
-        setLoading(false);
-        return;
-      }
-
-      const idsFromForms: string[] = (participants ?? []).map((p: any) => p.stagiaire_id);
-
-      const { data: bySelf, error: errBySelf } = await supabase
-        .from("stagiaires")
-        .select("*")
-        .eq("created_by", authUserId)
-        .is("deleted_at", null);
-      if (errBySelf) {
-        toast.error("Erreur lors du chargement des stagiaires");
-        setLoading(false);
-        return;
-      }
-
-      const selfIds = new Set((bySelf ?? []).map((s: any) => s.id));
-      const extraIds = idsFromForms.filter(id => !selfIds.has(id));
-
-      let byForms: any[] = [];
-      if (extraIds.length > 0) {
-        const { data, error: errByForms } = await supabase
-          .from("stagiaires")
-          .select("*")
-          .in("id", extraIds)
-          .is("deleted_at", null);
-        if (errByForms) {
-          toast.error("Erreur lors du chargement des stagiaires inscrits");
-          setLoading(false);
-          return;
-        }
-        byForms = data ?? [];
-      }
-
-      setStagiaires([...(bySelf ?? []), ...byForms]);
-      setLoading(false);
-    };
-
-    useEffect(() => { loadStagiaires(); }, [authUserId, formateurId]);
-
-    const openCreate = () => {
-      setEditing(null);
-      setForm(emptyForm);
-      setDialogOpen(true);
-    };
-
-    const openEdit = (s: any) => {
-      setEditing(s);
-      setForm({
-        first_name: s.first_name ?? "",
-        last_name: s.last_name ?? "",
-        birth_date: s.birth_date ?? "",
-        email: s.email ?? "",
-        phone: s.phone ?? "",
-        address: s.address ?? "",
-        city: s.city ?? "",
-        postal_code: s.postal_code ?? "",
-        notes: s.notes ?? "",
-      });
-      setDialogOpen(true);
-    };
-
-    const submit = async () => {
-      if (!form.first_name.trim() || !form.last_name.trim() || !form.birth_date) {
-        toast.error("Prénom, nom et date de naissance sont obligatoires");
-        return;
-      }
-      const { data: { user } } = await supabase.auth.getUser();
-      const organismeId = "00000000-0000-0000-0000-000000000001";
-
-      if (editing) {
-        const { error } = await supabase.from("stagiaires").update({
-          ...form,
-          birth_date: form.birth_date || null,
-          updated_at: new Date().toISOString(),
-        }).eq("id", editing.id);
-        if (error) { toast.error(error.message); return; }
-        await supabase.from("audit_log").insert({
-          organisme_id: organismeId,
-          user_id: user!.id,
-          user_role: "formateur",
-          action: "update",
-          table_name: "stagiaires",
-          record_id: editing.id,
-          payload: form,
-        });
-        toast.success("Stagiaire mis à jour");
-      } else {
-        const { data: created, error } = await supabase.from("stagiaires").insert({
-          ...form,
-          birth_date: form.birth_date || null,
-          created_by: user!.id,
-          organisme_id: organismeId,
-          statut: "en_attente",
-        }).select().single();
-        if (error) { toast.error(error.message); return; }
-        await supabase.from("audit_log").insert({
-          organisme_id: organismeId,
-          user_id: user!.id,
-          user_role: "formateur",
-          action: "create",
-          table_name: "stagiaires",
-          record_id: created.id,
-          payload: form,
-        });
-        toast.success("Stagiaire créé");
-        setNewStagiaireId(created.id);
-        setSelectedFormationId("");
-        setInscriptionOpen(true);
-      }
-      setDialogOpen(false);
-      loadStagiaires();
-    };
-
-    const confirmDelete = async () => {
-      if (!deleteTarget) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      const organismeId = "00000000-0000-0000-0000-000000000001";
-      const { error } = await supabase.from("stagiaires").update({
-        deleted_at: new Date().toISOString(),
-        deleted_by: user!.id,
-      }).eq("id", deleteTarget.id);
-      if (error) { toast.error(error.message); return; }
-      await supabase.from("audit_log").insert({
-        organisme_id: organismeId,
-        user_id: user!.id,
-        user_role: "formateur",
-        action: "delete",
-        table_name: "stagiaires",
-        record_id: deleteTarget.id,
-        payload: { first_name: deleteTarget.first_name, last_name: deleteTarget.last_name },
-      });
-      toast.success("Stagiaire archivé");
-      setDeleteTarget(null);
-      loadStagiaires();
-    };
-
-    const inscrire = async () => {
-      if (!newStagiaireId || !selectedFormationId) return;
-      const { error } = await supabase.from("formation_participants").insert({
-        stagiaire_id: newStagiaireId,
-        formation_id: selectedFormationId,
-        organisme_id: "00000000-0000-0000-0000-000000000001",
-      });
-      if (error) { toast.error(error.message); return; }
-      toast.success("Stagiaire inscrit à la formation");
-      setInscriptionOpen(false);
-      loadStagiaires();
-    };
-
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-display font-bold">Mes stagiaires</h1>
-          <Button size="sm" className="gap-1.5" onClick={openCreate}>
-            <Plus className="h-3.5 w-3.5" /> Nouveau stagiaire
-          </Button>
-        </div>
-
-        {loading ? (
-          <p className="text-sm text-muted-foreground text-center py-8">Chargement…</p>
-        ) : stagiaires.length === 0 ? (
-          <Card className="p-12 text-center text-muted-foreground text-sm border-dashed">
-            Aucun stagiaire — cliquez sur "Nouveau stagiaire" pour commencer
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {stagiaires.map(s => (
-              <Card key={s.id} className="p-4 border-border/50 bg-card/60">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary">
-                        {s.first_name?.[0]}{s.last_name?.[0]}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm">{s.last_name.toUpperCase()} {s.first_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.birth_date && new Date(s.birth_date).toLocaleDateString("fr-FR")}
-                        {s.city && ` · ${s.city}`}
-                        {s.email && ` · ${s.email}`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(s)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive/70 hover:text-destructive" onClick={() => setDeleteTarget(s)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editing ? "Modifier le stagiaire" : "Nouveau stagiaire"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Prénom *</Label>
-                  <Input value={form.first_name} onChange={e => setForm({...form, first_name: e.target.value})} />
-                </div>
-                <div>
-                  <Label>Nom *</Label>
-                  <Input value={form.last_name} onChange={e => setForm({...form, last_name: e.target.value})} />
-                </div>
-              </div>
-              <div>
-                <Label>Date de naissance *</Label>
-                <Input type="date" value={form.birth_date} onChange={e => setForm({...form, birth_date: e.target.value})} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Email</Label>
-                  <Input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-                </div>
-                <div>
-                  <Label>Téléphone</Label>
-                  <Input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
-                </div>
-              </div>
-              <div>
-                <Label>Adresse</Label>
-                <Input value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Ville</Label>
-                  <Input value={form.city} onChange={e => setForm({...form, city: e.target.value})} />
-                </div>
-                <div>
-                  <Label>Code postal</Label>
-                  <Input value={form.postal_code} onChange={e => setForm({...form, postal_code: e.target.value})} />
-                </div>
-              </div>
-              <div>
-                <Label>Notes</Label>
-                <Textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={2} className="resize-none" />
-              </div>
-              <Button className="w-full gradient-primary text-primary-foreground" onClick={submit}>
-                {editing ? "Enregistrer" : "Créer le stagiaire"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader>
-              <DialogTitle>Archiver ce stagiaire ?</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-muted-foreground">
-              <b>{deleteTarget?.first_name} {deleteTarget?.last_name}</b> sera archivé.
-              L'administrateur pourra le restaurer si besoin. Cette action n'est pas définitive.
-            </p>
-            <div className="flex gap-2 mt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>Annuler</Button>
-              <Button variant="destructive" className="flex-1" onClick={confirmDelete}>Archiver</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={inscriptionOpen} onOpenChange={setInscriptionOpen}>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader>
-              <DialogTitle>Inscrire à une formation ?</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-muted-foreground mb-3">
-              Stagiaire créé. Voulez-vous l'inscrire directement dans une de vos formations ?
-            </p>
-            <Select value={selectedFormationId} onValueChange={setSelectedFormationId}>
-              <SelectTrigger><SelectValue placeholder="Choisir une formation" /></SelectTrigger>
-              <SelectContent>
-                {formations.map((f: any) => (
-                  <SelectItem key={f.id} value={f.id}>{f.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex gap-2 mt-3">
-              <Button variant="outline" className="flex-1" onClick={() => setInscriptionOpen(false)}>Passer</Button>
-              <Button className="flex-1 gradient-primary text-primary-foreground" onClick={inscrire} disabled={!selectedFormationId}>
-                Inscrire
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    );
-  };
-
-  const PageCours = () => {
-    const [templates, setTemplates] = useState<any[]>([]);
-    const [cours, setCours] = useState<any[]>([]);
-    const [expanded, setExpanded] = useState<string | null>(null);
-
-    useEffect(() => {
-      if (!formateurId) return;
-      Promise.all([
-        supabase.from("formation_templates").select("*").eq("is_pack", false).order("code"),
-        supabase.from("cours").select("*").order("chapitre_numero", { ascending: true }),
-        // formations où ce formateur est assigné → types accessibles automatiquement
-        supabase.from("formations").select("type, template_code").eq("formateur_id", formateurId),
-        // cours manuellement accordés par l'admin
-        supabase.from("formateurs").select("cours_autorises").eq("id", formateurId).single(),
-      ]).then(([{ data: tpl }, { data: cr }, { data: forms }, { data: fmt }]) => {
-        const autoTypes = new Set<string>((forms ?? []).flatMap(f => [f.template_code, f.type].filter(Boolean)));
-        const manual: string[] = fmt?.cours_autorises ?? [];
-        manual.forEach(c => autoTypes.add(c));
-        if (tpl) setTemplates(tpl.filter(t => autoTypes.has(t.code)));
-        if (cr) setCours(cr);
-      });
-    }, [formateurId]);
-
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-display font-bold">Cours & contenus pédagogiques</h1>
-        <div className="space-y-3">
-          {templates.map(t => {
-            const chs = cours.filter(c => c.formation_type === t.code);
-            const isOpen = expanded === t.code;
-            return (
-              <Card key={t.code} className="border-border/50 bg-card/60 overflow-hidden">
-                <button
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/20 transition-colors"
-                  onClick={() => setExpanded(isOpen ? null : t.code)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <BookOpen className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{t.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t.duration_hours > 0 ? `${t.duration_hours}h` : "Durée variable"}
-                        {chs.length > 0 && ` · ${chs.length} chapitre${chs.length > 1 ? "s" : ""}`}
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`} />
-                </button>
-
-                {isOpen && (
-                  <div className="border-t border-border/50">
-                    {t.description && (
-                      <div className="px-4 py-3 bg-muted/20 border-b border-border/30">
-                        <p className="text-sm text-muted-foreground">{t.description}</p>
-                      </div>
-                    )}
-                    {chs.length === 0 ? (
-                      <p className="px-4 py-6 text-sm text-muted-foreground text-center">Aucun contenu pédagogique disponible</p>
-                    ) : (
-                      <div className="divide-y divide-border/30">
-                        {chs.map((ch, i) => (
-                          <div key={ch.id} className="px-4 py-3 flex gap-3">
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold mt-0.5">
-                              {ch.chapitre_numero ?? i + 1}
-                            </span>
-                            <div>
-                              <p className="text-sm font-medium">{ch.titre}</p>
-                              {ch.contenu && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{ch.contenu}</p>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-          {templates.length === 0 && (
-            <Card className="p-12 text-center text-muted-foreground text-sm border-dashed">
-              Aucun cours disponible
-            </Card>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   const PageCertifications = () => (
     <div className="space-y-6">
@@ -1178,8 +1115,8 @@ export default function EspaceFormateur() {
     switch (page) {
       case "dashboard": return <PageDashboard />;
       case "formations": return <PageFormations />;
-      case "stagiaires_fmt": return <PageStagiairesFormateur />;
-      case "cours": return <PageCours />;
+      case "stagiaires_fmt": return <PageStagiairesFormateur authUserId={authUserId} formateurId={formateurId} formations={formations} />;
+      case "cours": return <PageCours formateurId={formateurId} />;
       case "messagerie": return <PageMessagerie />;
       case "emargement": return <PageEmargement />;
       case "maincourante": return <MainCouranteFormateur formateurId={formateurId!} />;
