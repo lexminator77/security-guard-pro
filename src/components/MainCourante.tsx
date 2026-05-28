@@ -1057,9 +1057,6 @@ export function StatistiquesStagiaire({ stagiaireId }: { stagiaireId: string }) 
   const [fiches, setFiches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [periode, setPeriode] = useState<"semaine" | "mois" | "tout">("mois");
-  const [rapport, setRapport] = useState<string | null>(null);
-  const [loadingRapport, setLoadingRapport] = useState(false);
-
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -1098,40 +1095,6 @@ export function StatistiquesStagiaire({ stagiaireId }: { stagiaireId: string }) 
 
   const topTypes = Object.entries(statsType).sort(([,a]: any, [,b]: any) => b - a).slice(0, 5);
   const total = fichesFiltrees.length;
-
-  const genererRapport = async () => {
-    if (total === 0) { toast.error("Aucune fiche sur cette période"); return; }
-    setLoadingRapport(true);
-    setRapport(null);
-
-    const resume = `
-Période : ${periode === "semaine" ? "7 derniers jours" : periode === "mois" ? "30 derniers jours" : "Tout"}.
-Nombre total de fiches : ${total}.
-Répartition par famille : ${Object.entries(statsFamille).map(([k,v]) => `${k}: ${v}`).join(", ")}.
-Top événements : ${topTypes.map(([k,v]) => `${k}: ${v}`).join(", ")}.
-Sévérités physiques : ${Object.entries(statsSev).map(([k,v]) => `${k}: ${v}`).join(", ")}.
-    `.trim();
-
-    try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: "Tu es un expert en sécurité et sûreté. Tu analyses les statistiques de main courante d'un stagiaire en formation sécurité (SSIAP, APS, SST) et tu génères un rapport pédagogique en français. Sois concis, constructif et pratique. Structure ta réponse avec : 1) Analyse des points récurrents, 2) Points de vigilance, 3) Recommandations concrètes.",
-          messages: [{ role: "user", content: `Voici les statistiques de main courante de ce stagiaire :\n\n${resume}\n\nGénère un rapport d'analyse pédagogique.` }],
-        }),
-      });
-      const data = await response.json();
-      const text = data.content?.[0]?.text ?? "Impossible de générer le rapport.";
-      setRapport(text);
-    } catch (err) {
-      toast.error("Erreur lors de la génération du rapport");
-    } finally {
-      setLoadingRapport(false);
-    }
-  };
 
   const maxFamille = Math.max(...Object.values(statsFamille) as number[], 1);
 
