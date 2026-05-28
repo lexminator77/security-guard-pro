@@ -29,8 +29,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SignatureModal } from "@/components/SignatureModal";
-type Page = "dashboard" | "formations" | "stagiaires_fmt" | "cours" | "emargement" | "certifications" | "profil" | "stagiaire" | "messagerie" | "maincourante" | "mcconfig" | "consignes" | "permisfeu" | "rondier";import { FileText } from "lucide-react";
+type Page = "dashboard" | "formations" | "stagiaires_fmt" | "cours" | "emargement" | "certifications" | "profil" | "stagiaire" | "messagerie" | "maincourante" | "mcconfig" | "consignes" | "permisfeu" | "rondier" | "acces_badges";
+import { FileText } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { MainCouranteFormateur, MainCouranteConfig, ConsignesFormateur, PermisFeuFormateur, RondierFormateur } from "@/components/MainCourante";
+import { AccesBadges } from "@/components/AccesBadges";
 
 const CERT_LABELS: Record<string, string> = {
   sst_date: "SST", tfp_aps_date: "TFP APS", mac_aps_date: "MAC APS",
@@ -652,6 +655,7 @@ export default function EspaceFormateur() {
     { id: "consignes", label: "Consignes", icon: FileText, parent: "operations" },
     { id: "permisfeu", label: "Permis de feu", icon: FileText, parent: "operations" },
     { id: "rondier", label: "Rondier", icon: FileText, parent: "operations" },
+    { id: "acces_badges", label: "Accès & Badges", icon: CreditCard, parent: "operations" },
     { id: "certifications", label: "Mes certifications", icon: Award },
     { id: "profil", label: "Mon profil", icon: User },
   ];
@@ -1124,6 +1128,7 @@ export default function EspaceFormateur() {
      case "consignes": return <ConsignesFormateur formateurId={formateurId!} />;
      case "permisfeu": return <PermisFeuFormateur />;
      case "rondier": return <RondierFormateur formateurId={formateurId!} />;
+     case "acces_badges": return <AccesBadges formateurId={formateurId!} />;
       case "certifications": return <PageCertifications />;
       case "profil": return <PageProfil />;
       case "stagiaire": return <PageFicheStagiaire />;
