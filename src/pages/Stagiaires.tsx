@@ -65,7 +65,12 @@ export default function Stagiaires() {
   const [docs, setDocs] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
-  const [tab, setTab] = useState<"actif" | "archive">("actif");
+  const [tab, setTab] = useState<"actif" | "archive" | "corbeille" | "activite">("actif");
+  const [corbeille, setCorbeille] = useState<any[]>([]);
+  const [auditLog, setAuditLog] = useState<any[]>([]);
+  const [loadingCorbeille, setLoadingCorbeille] = useState(false);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [hardDeleteTarget, setHardDeleteTarget] = useState<any | null>(null);
   const [archiveNote, setArchiveNote] = useState("");
   const [archiveDialog, setArchiveDialog] = useState(false);
   const [ficheTab, setFicheTab] = useState<"documents" | "certifications">("documents");
@@ -78,6 +83,11 @@ export default function Stagiaires() {
   });
 
   useEffect(() => { document.title = "Stagiaires — SecureCRM"; load(); }, []);
+
+  useEffect(() => {
+    if (tab === "corbeille") loadCorbeille();
+    if (tab === "activite") loadAudit();
+  }, [tab]);
 
   const load = async () => {
     const { data, error } = await supabase.from("stagiaires").select("*").order("created_at", { ascending: false });
@@ -143,6 +153,58 @@ export default function Stagiaires() {
     setArchiveNote("");
     setSelected(null);
     load();
+  };
+
+  const loadCorbeille = async () => {
+    setLoadingCorbeille(true);
+    const { data } = await supabase
+      .from("stagiaires")
+      .select("*, deleted_by_profile:deleted_by(email)")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+    setCorbeille(data ?? []);
+    setLoadingCorbeille(false);
+  };
+
+  const loadAudit = async () => {
+    setLoadingAudit(true);
+    const { data } = await supabase
+      .from("audit_log")
+      .select("*, user:user_id(email)")
+      .eq("table_name", "stagiaires")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    setAuditLog(data ?? []);
+    setLoadingAudit(false);
+  };
+
+  const restaurer = async (s: any) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("stagiaires").update({
+      deleted_at: null,
+      deleted_by: null,
+    }).eq("id", s.id);
+    if (error) { toast.error(error.message); return; }
+    await supabase.from("audit_log").insert({
+      organisme_id: "00000000-0000-0000-0000-000000000001",
+      user_id: user!.id,
+      user_role: "administrateur",
+      action: "restore",
+      table_name: "stagiaires",
+      record_id: s.id,
+      payload: { first_name: s.first_name, last_name: s.last_name },
+    });
+    toast.success(`${s.first_name} ${s.last_name} restauré`);
+    loadCorbeille();
+  };
+
+  const hardDelete = async () => {
+    if (!hardDeleteTarget) return;
+    const { error } = await supabase.from("stagiaires").delete().eq("id", hardDeleteTarget.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Stagiaire supprimé définitivement");
+    setHardDeleteTarget(null);
+    loadCorbeille();
   };
 
   const reactiver = async (s: any) => {
@@ -525,67 +587,180 @@ export default function Stagiaires() {
               <TabsTrigger value="archive">
                 Archivés <Badge variant="secondary" className="ml-2">{archives.length}</Badge>
               </TabsTrigger>
+              <TabsTrigger value="corbeille">Corbeille</TabsTrigger>
+              <TabsTrigger value="activite">Activité</TabsTrigger>
             </TabsList>
           </Tabs>
-          <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
+          {(tab === "actif" || tab === "archive") && (
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+          )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-border">
-                <th className="pb-3 px-2">Nom</th>
-                <th className="pb-3 px-2">Contact</th>
-                <th className="pb-3 px-2">Autorisation CNAPS</th>
-                <th className="pb-3 px-2">Expiration auto.</th>
-                <th className="pb-3 px-2">Statut</th>
-                <th className="pb-3 px-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">
-                  {tab === "archive" ? "Aucun stagiaire archivé" : "Aucun stagiaire actif"}
-                </td></tr>
-              )}
-              {filtered.map((s) => {
-                const autoStatus = autorisationStatus(s.autorisation_expiry);
+        {(tab === "actif" || tab === "archive") && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-border">
+                  <th className="pb-3 px-2">Nom</th>
+                  <th className="pb-3 px-2">Contact</th>
+                  <th className="pb-3 px-2">Autorisation CNAPS</th>
+                  <th className="pb-3 px-2">Expiration auto.</th>
+                  <th className="pb-3 px-2">Statut</th>
+                  <th className="pb-3 px-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 && (
+                  <tr><td colSpan={6} className="py-12 text-center text-muted-foreground">
+                    {tab === "archive" ? "Aucun stagiaire archivé" : "Aucun stagiaire actif"}
+                  </td></tr>
+                )}
+                {filtered.map((s) => {
+                  const autoStatus = autorisationStatus(s.autorisation_expiry);
+                  return (
+                    <tr key={s.id}
+                      className="border-b border-border/50 hover:bg-secondary/30 transition-colors cursor-pointer"
+                      onClick={() => openFiche(s)}>
+                      <td className="py-3 px-2 font-medium">{s.first_name} {s.last_name}</td>
+                      <td className="py-3 px-2 text-muted-foreground">{s.email || s.phone || "—"}</td>
+                      <td className="py-3 px-2 font-mono text-xs">{s.autorisation_numero || "—"}</td>
+                      <td className="py-3 px-2">
+                        {autoStatus ? (
+                          <Badge variant="outline" className={`text-xs ${autoStatus.color}`}>{autoStatus.label}</Badge>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </td>
+                      <td className="py-3 px-2"><Badge variant="outline" className={STATUS_COLOR[s.status]}>{STATUS_LABEL[s.status]}</Badge></td>
+                      <td className="py-3 px-2 text-right" onClick={(e) => e.stopPropagation()}>
+                        {isAdmin && (
+                          tab === "archive" ? (
+                            <Button size="sm" variant="ghost" onClick={() => reactiver(s)} className="text-primary">
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button size="icon" variant="ghost" onClick={() => remove(s.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {tab === "corbeille" && (
+          loadingCorbeille ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Chargement…</p>
+          ) : corbeille.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+              La corbeille est vide
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {corbeille.map(s => (
+                <div key={s.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                  <div>
+                    <p className="font-medium text-sm">{s.last_name?.toUpperCase()} {s.first_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Archivé le {new Date(s.deleted_at).toLocaleDateString("fr-FR")}
+                      {s.deleted_by_profile?.email && ` par ${s.deleted_by_profile.email}`}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="gap-1.5 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10" onClick={() => restaurer(s)}>
+                      <RotateCcw className="h-3.5 w-3.5" /> Restaurer
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setHardDeleteTarget(s)}>
+                      <Trash2 className="h-3.5 w-3.5" /> Supprimer définitivement
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {tab === "activite" && (
+          loadingAudit ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Chargement…</p>
+          ) : auditLog.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+              Aucune activité enregistrée
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {auditLog.map(log => {
+                const actionLabel: Record<string, string> = {
+                  create: "a créé",
+                  update: "a modifié",
+                  delete: "a archivé",
+                  restore: "a restauré",
+                };
+                const actionColor: Record<string, string> = {
+                  create: "text-emerald-500",
+                  update: "text-blue-400",
+                  delete: "text-red-400",
+                  restore: "text-yellow-500",
+                };
+                const elapsed = Math.round((Date.now() - new Date(log.created_at).getTime()) / 60000);
+                const elapsedStr = elapsed < 60
+                  ? `il y a ${elapsed} min`
+                  : elapsed < 1440
+                  ? `il y a ${Math.round(elapsed / 60)}h`
+                  : `le ${new Date(log.created_at).toLocaleDateString("fr-FR")}`;
+                const stagiaireName = log.payload?.last_name
+                  ? `${log.payload.last_name?.toUpperCase()} ${log.payload.first_name ?? ""}`
+                  : log.record_id.slice(0, 8);
+
                 return (
-                  <tr key={s.id}
-                    className="border-b border-border/50 hover:bg-secondary/30 transition-colors cursor-pointer"
-                    onClick={() => openFiche(s)}>
-                    <td className="py-3 px-2 font-medium">{s.first_name} {s.last_name}</td>
-                    <td className="py-3 px-2 text-muted-foreground">{s.email || s.phone || "—"}</td>
-                    <td className="py-3 px-2 font-mono text-xs">{s.autorisation_numero || "—"}</td>
-                    <td className="py-3 px-2">
-                      {autoStatus ? (
-                        <Badge variant="outline" className={`text-xs ${autoStatus.color}`}>{autoStatus.label}</Badge>
-                      ) : <span className="text-xs text-muted-foreground">—</span>}
-                    </td>
-                    <td className="py-3 px-2"><Badge variant="outline" className={STATUS_COLOR[s.status]}>{STATUS_LABEL[s.status]}</Badge></td>
-                    <td className="py-3 px-2 text-right" onClick={(e) => e.stopPropagation()}>
-                      {isAdmin && (
-                        tab === "archive" ? (
-                          <Button size="sm" variant="ghost" onClick={() => reactiver(s)} className="text-primary">
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <Button size="icon" variant="ghost" onClick={() => remove(s.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )
-                      )}
-                    </td>
-                  </tr>
+                  <div key={log.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/30 transition-colors">
+                    <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-[10px] font-bold text-primary">
+                        {log.user?.email?.[0]?.toUpperCase() ?? "?"}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm">
+                        <span className="font-medium">{log.user?.email ?? "Utilisateur inconnu"}</span>
+                        {" "}
+                        <span className={actionColor[log.action] ?? "text-foreground"}>{actionLabel[log.action] ?? log.action}</span>
+                        {" "}
+                        <span className="font-medium">{stagiaireName}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">{elapsedStr}</p>
+                    </div>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${log.user_role === "formateur" ? "bg-blue-500/10 text-blue-400" : "bg-primary/10 text-primary"}`}>
+                      {log.user_role}
+                    </span>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )
+        )}
       </Card>
+
+      <Dialog open={!!hardDeleteTarget} onOpenChange={() => setHardDeleteTarget(null)}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Supprimer définitivement ?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            <b>{hardDeleteTarget?.first_name} {hardDeleteTarget?.last_name}</b> sera supprimé définitivement.
+            Cette action est <b>irréversible</b>.
+          </p>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setHardDeleteTarget(null)}>Annuler</Button>
+            <Button variant="destructive" className="flex-1" onClick={hardDelete}>Supprimer définitivement</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
