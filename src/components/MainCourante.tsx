@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Plus, ChevronLeft, Clock, AlertTriangle, CheckCircle,
-  FileText, Eye, X
+  FileText, Eye, X, Camera, Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { FiltreDateRange, FiltreDateValue, appliquerFiltreDateRange } from "./FiltreDateRange";
@@ -76,6 +76,9 @@ function Formulaire({ stagiaireId, formationId, editData, onSaved, onCancel }: {
   const [description, setDescription] = useState(editData?.description ?? "");
   const [collegues, setCollegues] = useState<string[]>(editData?.collegues ?? []);
   const [nouveauCollegue, setNouveauCollegue] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(editData?.photo_url ?? null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [famillesConfig, setFamillesConfig] = useState<string[]>([]);
   const [typesConfig, setTypesConfig] = useState<any[]>([]);
@@ -92,6 +95,19 @@ function Formulaire({ stagiaireId, formationId, editData, onSaved, onCancel }: {
   const typesDispos = famille ? typesConfig.filter(t => t.famille_ref === famille).map(t => t.valeur) : [];
   const handleFamilleChange = (val: string) => { setFamille(val); setTypeEvt(""); };
 
+  const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    const path = `mc-photos/${stagiaireId}/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from("documents").upload(path, file, { upsert: false });
+    if (error) { toast.error("Erreur upload photo"); setUploadingPhoto(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from("documents").getPublicUrl(path);
+    setPhotoUrl(publicUrl);
+    setUploadingPhoto(false);
+    if (photoRef.current) photoRef.current.value = "";
+  };
+
   const save = async (statut: "brouillon" | "valide") => {
     if (!famille || !typeEvt) { toast.error("Famille et type d'événement obligatoires"); return; }
     setSaving(true);
@@ -103,6 +119,7 @@ function Formulaire({ stagiaireId, formationId, editData, onSaved, onCancel }: {
       intervenant_2: int2 || null, appel_2: appel2 || null, arrivee_2: arrivee2 || null, depart_2: depart2 || null,
       date_debut: dateDeb, heure_debut: heureDeb, date_fin: dateFin || null, heure_fin: heureFin || null,
       description: description || null, collegues: collegues.length > 0 ? collegues : [], statut,
+      photo_url: photoUrl ?? null,
     };
     let error; let ficheId = editData?.id;
     if (editData?.id) {
@@ -221,6 +238,32 @@ function Formulaire({ stagiaireId, formationId, editData, onSaved, onCancel }: {
           </div>
         )}
       </Card>
+      <Card className="p-6 bg-card/60 border-border/50 space-y-4">
+        <h2 className="font-semibold text-sm flex items-center gap-2"><Camera className="h-4 w-4 text-primary" /> Photo de l'incident (optionnelle)</h2>
+        {photoUrl ? (
+          <div className="relative w-full max-w-sm">
+            <img src={photoUrl} alt="Photo incident" className="w-full rounded-lg border border-border/50 object-cover max-h-64" />
+            <button
+              onClick={() => setPhotoUrl(null)}
+              className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5 text-white" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => photoRef.current?.click()}
+            disabled={uploadingPhoto}
+            className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-border/50 hover:border-primary/40 hover:bg-primary/5 transition-colors text-sm text-muted-foreground w-full sm:w-auto"
+          >
+            <Camera className="h-4 w-4" />
+            {uploadingPhoto ? "Upload en cours…" : "Ajouter une photo"}
+          </button>
+        )}
+        <input ref={photoRef} type="file" className="hidden" accept="image/*" capture="environment" onChange={uploadPhoto} />
+      </Card>
+
       <div className="flex gap-3">
         <Button variant="outline" className="flex-1" disabled={saving} onClick={() => save("brouillon")}>Enregistrer brouillon</Button>
         <Button className="flex-1 bg-primary hover:bg-primary/90" disabled={saving} onClick={() => save("valide")}>
@@ -250,6 +293,11 @@ function FicheCard({ fiche, onEdit, readOnly = false }: { fiche: any; onEdit?: (
         {fiche.victime && fiche.victime !== "Pas de victime" && <span className="text-yellow-400">⚠️ {fiche.victime}</span>}
       </div>
       {fiche.description && <p className="text-xs text-muted-foreground italic border-t border-border/30 pt-2 line-clamp-2">{fiche.description}</p>}
+      {fiche.photo_url && (
+        <a href={fiche.photo_url} target="_blank" rel="noopener noreferrer" className="block mt-1">
+          <img src={fiche.photo_url} alt="Photo incident" className="w-full max-h-48 object-cover rounded-lg border border-border/40" />
+        </a>
+      )}
       {readOnly && fiche.stagiaire && (
         <p className="text-xs text-muted-foreground border-t border-border/30 pt-2">
           Par : <span className="text-foreground font-medium">{fiche.stagiaire.first_name} {fiche.stagiaire.last_name}</span>
