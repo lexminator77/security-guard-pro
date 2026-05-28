@@ -1183,27 +1183,9 @@ export function StatistiquesStagiaire({ stagiaireId }: { stagiaireId: string }) 
             </Card>
           )}
 
-          {total === 0 ? (
+          {total === 0 && (
             <Card className="p-12 text-center border-dashed">
               <p className="text-muted-foreground text-sm">Aucune fiche sur cette période</p>
-            </Card>
-          ) : (
-            /* Rapport IA */
-            <Card className="p-6 bg-card/60 border-border/50 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-sm">Rapport IA</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Analyse et recommandations basées sur vos fiches</p>
-                </div>
-                <Button onClick={genererRapport} disabled={loadingRapport} size="sm" className="bg-primary hover:bg-primary/90 gap-2">
-                  {loadingRapport ? "Génération…" : "Générer le rapport"}
-                </Button>
-              </div>
-              {rapport && (
-                <div className="bg-muted/20 border border-border/30 rounded-lg p-4 text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                  {rapport}
-                </div>
-              )}
             </Card>
           )}
         </>
