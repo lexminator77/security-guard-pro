@@ -34,6 +34,7 @@ import Facturation from "./pages/Facturation";
 import FinancementOpco from "./pages/FinancementOpco";
 import PasseportPrevention from "./pages/PasseportPrevention";
 import VerificationCNAPS from "./pages/VerificationCNAPS";
+import Aujourd_hui from "./pages/Aujourd_hui";
 
 const queryClient = new QueryClient();
 
@@ -48,7 +49,8 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<Aujourd_hui />} />
+              <Route path="/aujourd-hui" element={<Aujourd_hui />} />
               <Route path="/stagiaires" element={<Stagiaires />} />
               <Route path="/formations" element={<Formations />} />
               <Route path="/planning" element={<Planning />} />

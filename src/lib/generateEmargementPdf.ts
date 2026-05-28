@@ -25,7 +25,7 @@ export async function generateEmargementPdf(
   formation: { id: string; title: string; type: string; start_date: string; end_date: string },
   supabase: SupabaseClient
 ): Promise<void> {
-  const [{ data: esData }, { data: efData }] = await Promise.all([
+  const [{ data: esData, error: esError }, { data: efData, error: efError }] = await Promise.all([
     supabase
       .from("emargements_stagiaire")
       .select("*, stagiaire:stagiaires(id, first_name, last_name)")
@@ -35,6 +35,8 @@ export async function generateEmargementPdf(
       .select("*, formateur:formateurs(id, first_name, last_name)")
       .eq("formation_id", formation.id),
   ]);
+  if (esError) throw new Error(esError.message);
+  if (efError) throw new Error(efError.message);
 
   const days = getDaysBetween(formation.start_date, formation.end_date);
   const periodes = ["matin", "apres_midi"] as const;
@@ -103,23 +105,31 @@ export async function generateEmargementPdf(
     didDrawCell: (data) => {
       if (data.section === "body" && data.column.index > 0) {
         const raw = data.cell.raw as any;
-        if (raw?._sig) {
+        if (raw?._sig && typeof raw._sig === "string" && raw._sig.startsWith("data:image/")) {
           const pad = 1;
-          doc.addImage(
-            raw._sig,
-            "PNG",
-            data.cell.x + pad,
-            data.cell.y + pad,
-            data.cell.width - pad * 2,
-            data.cell.height - pad * 2
-          );
+          try {
+            doc.addImage(
+              raw._sig,
+              "PNG",
+              data.cell.x + pad,
+              data.cell.y + pad,
+              data.cell.width - pad * 2,
+              data.cell.height - pad * 2
+            );
+          } catch {
+            // skip malformed signature — cell remains empty
+          }
         }
       }
     },
   });
 
   // Formateur section
-  const finalY = (doc as any).lastAutoTable.finalY + 8;
+  let finalY = (doc as any).lastAutoTable.finalY + 8;
+  if (finalY + 25 > doc.internal.pageSize.height) {
+    doc.addPage();
+    finalY = 20;
+  }
   doc.setFontSize(9);
   doc.text("Signature du formateur :", 14, finalY + 5);
 

@@ -1,0 +1,2 @@
+ALTER TABLE public.formations
+  ADD COLUMN IF NOT EXISTS cout_formateur NUMERIC(10,2) NOT NULL DEFAULT 0;

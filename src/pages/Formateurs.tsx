@@ -63,8 +63,16 @@ export default function Formateurs() {
   const [archiveDialog, setArchiveDialog] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<Formateur | null>(null);
   const [archiveNote, setArchiveNote] = useState("");
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [coursAutorises, setCoursAutorises] = useState<string[]>([]);
 
-  useEffect(() => { document.title = "Formateurs — SecureCRM"; load(); }, []);
+  useEffect(() => {
+    document.title = "Formateurs — SecureCRM";
+    load();
+    supabase.from("formation_templates").select("code, label").eq("is_pack", false).order("code").then(({ data }) => {
+      if (data) setTemplates(data);
+    });
+  }, []);
 
   const load = async () => {
     const today = new Date().toISOString().slice(0, 10);
@@ -76,10 +84,11 @@ export default function Formateurs() {
     setActiveIds(new Set((actives ?? []).map((x: any) => x.formateur_id).filter(Boolean)));
   };
 
-  const openNew = () => { setEditing(null); setForm(empty); setOpen(true); };
+  const openNew = () => { setEditing(null); setForm(empty); setCoursAutorises([]); setOpen(true); };
   const openEdit = (f: Formateur) => {
     setEditing(f);
     setForm({ ...empty, ...Object.fromEntries(Object.keys(empty).map(k => [k, f[k] ?? ""])) });
+    setCoursAutorises(f.cours_autorises ?? []);
     setOpen(true);
   };
 
@@ -109,8 +118,9 @@ export default function Formateurs() {
     e.preventDefault();
     try {
       schema.parse({ first_name: form.first_name, last_name: form.last_name, email: form.email, phone: form.phone });
-      const payload: any = { ...form };
-      Object.keys(payload).forEach(k => { if (payload[k] === "") payload[k] = null; });
+      const payload: any = { ...form, cours_autorises: coursAutorises };
+      Object.keys(payload).forEach(k => { if (payload[k] === "" ) payload[k] = null; });
+      payload.cours_autorises = coursAutorises;
       if (editing) {
         const { error } = await supabase.from("formateurs").update(payload).eq("id", editing.id);
         if (error) throw error;
@@ -409,6 +419,34 @@ export default function Formateurs() {
                 </div>
               </div>
             ))}
+
+            {/* Cours autorisés */}
+            <div className="border-t border-border pt-3">
+              <h3 className="font-semibold text-sm mb-1">Cours visibles (accès supplémentaires)</h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Le formateur voit automatiquement les cours des formations où il est assigné.
+                Cochez ici pour lui donner accès à des cours supplémentaires.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {templates.map(t => {
+                  const checked = coursAutorises.includes(t.code);
+                  return (
+                    <label key={t.code} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${checked ? "border-primary/50 bg-primary/5" : "border-border hover:bg-muted/30"}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => setCoursAutorises(prev =>
+                          checked ? prev.filter(c => c !== t.code) : [...prev, t.code]
+                        )}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm font-medium">{t.code}</span>
+                      <span className="text-xs text-muted-foreground truncate">{t.label.split("—")[1]?.trim() ?? t.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
 
             <Button type="submit" className="w-full gradient-primary text-primary-foreground">Enregistrer</Button>
           </form>

@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, GraduationCap, Trash2, Calendar, MapPin, Users, UserPlus, UserCheck, Euro, FileText, Download, CheckCircle2, XCircle, Clock, Pencil, Receipt, Landmark } from "lucide-react";
 import { toast } from "sonner";
@@ -88,14 +88,15 @@ export default function Formations() {
   const [list, setList] = useState<any[]>([]);
   const [stagiaires, setStagiaires] = useState<Stagiaire[]>([]);
   const [formateurs, setFormateurs] = useState<Formateur[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
   const [participantsByFormation, setParticipantsByFormation] = useState<Record<string, Participant[]>>({});
   const [open, setOpen] = useState(false);
   const [selectedStagiaires, setSelectedStagiaires] = useState<string[]>([]);
   const [tab, setTab] = useState<"en_cours" | "a_venir" | "passees">("en_cours");
   const [form, setForm] = useState({
-    title: "", type: "APS", description: "", start_date: "", end_date: "",
+    title: "", template_code: "", type: "APS", description: "", start_date: "", end_date: "",
     location: "", max_participants: 12, formateur_id: "", showRemarque: false,
-    prix_ht: 0, duration_hours: 0,
+    prix_unitaire: 0, duration_hours: 0, cout_formateur: 0,
   });
   const [manageOpen, setManageOpen] = useState(false);
   const [manageFormation, setManageFormation] = useState<any | null>(null);
@@ -103,6 +104,7 @@ export default function Formations() {
   const [editFormateurOpen, setEditFormateurOpen] = useState(false);
   const [editFormateurFormation, setEditFormateurFormation] = useState<any | null>(null);
   const [editFormateurId, setEditFormateurId] = useState<string>("");
+  const [editCoutFormateur, setEditCoutFormateur] = useState<number>(0);
   const [resultatComments, setResultatComments] = useState<Record<string, string>>({});
   const [qStats, setQStats] = useState<Record<string, Record<string, { sent: number; completed: number }>>>({});
   const [qSendOpen, setQSendOpen] = useState(false);
@@ -145,7 +147,13 @@ export default function Formations() {
   const [savingOpco, setSavingOpco] = useState(false);
   const [opcoReloadKey, setOpcoReloadKey] = useState(0);
 
-  useEffect(() => { document.title = "Formations — SecureCRM"; load(); }, []);
+  useEffect(() => {
+    document.title = "Formations — SecureCRM";
+    load();
+    supabase.from("formation_templates").select("*").order("is_pack").order("code").then(({ data }) => {
+      if (data) setTemplates(data);
+    });
+  }, []);
 
   useEffect(() => {
     if (!opcoModal) { setOpcoDossiers([]); return; }
@@ -209,12 +217,18 @@ export default function Formations() {
     e.preventDefault();
     if (!form.title || !form.start_date || !form.end_date) { toast.error("Champs requis manquants"); return; }
     const { data: { user } } = await supabase.auth.getUser();
+    const VALID_TYPES = new Set(["APS","SST","SSIAP1","SSIAP2","SSIAP3","MAC_APS","H0B0","AUTRE"]);
+    const dbType = VALID_TYPES.has(form.type) ? form.type : "AUTRE";
+    const nbStagiaires = selectedStagiaires.length > 0 ? selectedStagiaires.length : form.max_participants;
+    const prixHt = form.prix_unitaire > 0 ? form.prix_unitaire * nbStagiaires : 0;
     const payload: any = {
-      title: form.title, type: form.type as any, description: form.description || null,
+      title: form.title, type: dbType as any, description: form.description || null,
       start_date: form.start_date, end_date: form.end_date, location: form.location || null,
       max_participants: form.max_participants, created_by: user?.id,
-      prix_ht: form.prix_ht || 0,
+      prix_ht: prixHt,
       duration_hours: form.duration_hours || 0,
+      template_code: form.template_code || null,
+      cout_formateur: form.cout_formateur || 0,
     };
     if (form.formateur_id && form.formateur_id !== "") payload.formateur_id = form.formateur_id;
     const { data: created, error } = await supabase.from("formations").insert(payload).select().single();
@@ -226,7 +240,7 @@ export default function Formations() {
     }
     toast.success(`Formation créée${selectedStagiaires.length ? ` avec ${selectedStagiaires.length} stagiaire(s)` : ""}`);
     setOpen(false);
-    setForm({ title: "", type: "APS", description: "", start_date: "", end_date: "", location: "", max_participants: 12, formateur_id: "", showRemarque: false, prix_ht: 0, duration_hours: 0 });
+    setForm({ title: "", template_code: "", type: "APS", description: "", start_date: "", end_date: "", location: "", max_participants: 12, formateur_id: "", showRemarque: false, prix_unitaire: 0, duration_hours: 0, cout_formateur: 0 });
     setSelectedStagiaires([]);
     load();
   };
@@ -246,6 +260,7 @@ export default function Formations() {
   const openEditFormateur = (f: any) => {
     setEditFormateurFormation(f);
     setEditFormateurId(f.formateur_id ?? "none");
+    setEditCoutFormateur(f.cout_formateur ?? 0);
     setEditFormateurOpen(true);
   };
  
@@ -314,7 +329,7 @@ export default function Formations() {
 
   const saveEditFormateur = async () => {
     if (!editFormateurFormation) return;
-    const payload: any = {};
+    const payload: any = { cout_formateur: editCoutFormateur };
     if (!editFormateurId || editFormateurId === "" || editFormateurId === "none") {
       payload.formateur_id = null;
     } else {
@@ -322,7 +337,7 @@ export default function Formations() {
     }
     const { error } = await supabase.from("formations").update(payload).eq("id", editFormateurFormation.id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Formateur mis à jour");
+    toast.success("Formateur et coût mis à jour");
     setEditFormateurOpen(false);
     load();
   };
@@ -759,26 +774,82 @@ export default function Formations() {
           <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Nouvelle formation</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
-              <TitleInput value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Type</Label>
-                  <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Places max</Label><Input type="number" value={form.max_participants} onChange={(e) => setForm({ ...form, max_participants: +e.target.value })} /></div>
+              {/* Template selector */}
+              <div>
+                <Label>Formation / Pack <span className="text-destructive">*</span></Label>
+                <Select
+                  value={form.template_code}
+                  onValueChange={(v) => {
+                    const tpl = templates.find(t => t.code === v);
+                    if (!tpl) return;
+                    const VALID_TYPES = new Set(["APS","SST","SSIAP1","SSIAP2","SSIAP3","MAC_APS","H0B0","AUTRE"]);
+                    setForm(f => ({
+                      ...f,
+                      template_code: v,
+                      type: VALID_TYPES.has(v) ? v : "AUTRE",
+                      title: tpl.label,
+                      prix_unitaire: tpl.prix_unitaire ?? tpl.prix_ht ?? 0,
+                      duration_hours: tpl.duration_hours ?? 0,
+                    }));
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Choisir dans le catalogue…" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Formations</SelectLabel>
+                      {templates.filter(t => !t.is_pack).map(t => (
+                        <SelectItem key={t.code} value={t.code}>{t.code} — {t.label.split("—")[1]?.trim() ?? t.label}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                    {templates.some(t => t.is_pack) && (
+                      <>
+                        <SelectSeparator />
+                        <SelectGroup>
+                          <SelectLabel>Packs</SelectLabel>
+                          {templates.filter(t => t.is_pack).map(t => (
+                            <SelectItem key={t.code} value={t.code}>📦 {t.label}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Intitulé — auto-filled, editable */}
+              <TitleInput value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
+
+              {/* Participants + prix calculé */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Prix HT (€)</Label>
-                  <Input type="number" min="0" step="0.01" value={form.prix_ht} onChange={(e) => setForm({ ...form, prix_ht: parseFloat(e.target.value) || 0 })} />
+                  <Label>Nombre de stagiaires (max 12)</Label>
+                  <Input type="number" min={1} max={12} value={form.max_participants}
+                    onChange={(e) => setForm({ ...form, max_participants: Math.min(12, Math.max(1, +e.target.value)) })} />
                 </div>
                 <div>
-                  <Label>Durée (heures)</Label>
-                  <Input type="number" min="0" step="0.5" value={form.duration_hours} onChange={(e) => setForm({ ...form, duration_hours: parseFloat(e.target.value) || 0 })} />
+                  <Label>Prix total estimé</Label>
+                  {form.prix_unitaire > 0 ? (
+                    <div className="mt-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                      <p className="text-[12px] text-muted-foreground">
+                        {form.max_participants} × {form.prix_unitaire.toLocaleString("fr-FR")} €
+                      </p>
+                      <p className="text-[15px] font-bold text-primary">
+                        {(form.prix_unitaire * form.max_participants).toLocaleString("fr-FR")} €
+                      </p>
+                    </div>
+                  ) : (
+                    <Input type="number" min={0} step={0.01} placeholder="0"
+                      value={form.prix_unitaire || ""}
+                      onChange={(e) => setForm({ ...form, prix_unitaire: parseFloat(e.target.value) || 0 })} />
+                  )}
                 </div>
+              </div>
+
+              {/* Durée */}
+              <div>
+                <Label>Durée (heures)</Label>
+                <Input type="number" min="0" step="0.5" value={form.duration_hours}
+                  onChange={(e) => setForm({ ...form, duration_hours: parseFloat(e.target.value) || 0 })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Début *</Label><Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} required /></div>
@@ -794,16 +865,31 @@ export default function Formations() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="flex items-center gap-2"><UserCheck className="h-4 w-4" /> Formateur</Label>
-                <Select value={form.formateur_id} onValueChange={(v) => setForm({ ...form, formateur_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner un formateur (optionnel)" /></SelectTrigger>
-                  <SelectContent>
-                    {formateurs.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>{f.last_name.toUpperCase()} {f.first_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="flex items-center gap-2"><UserCheck className="h-4 w-4" /> Formateur</Label>
+                  <Select value={form.formateur_id} onValueChange={(v) => setForm({ ...form, formateur_id: v })}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner (optionnel)" /></SelectTrigger>
+                    <SelectContent>
+                      {formateurs.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>{f.last_name.toUpperCase()} {f.first_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Coût formateur (€)</Label>
+                  <Input type="number" min={0} step={0.01} placeholder="0"
+                    value={form.cout_formateur || ""}
+                    onChange={(e) => setForm({ ...form, cout_formateur: parseFloat(e.target.value) || 0 })} />
+                  {form.cout_formateur > 0 && form.prix_unitaire > 0 && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Marge estimée : <span className={form.prix_unitaire * form.max_participants - form.cout_formateur >= 0 ? "text-emerald-400" : "text-red-400"}>
+                        {(form.prix_unitaire * form.max_participants - form.cout_formateur).toLocaleString("fr-FR")} €
+                      </span>
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox id="remarque-check" checked={form.showRemarque} onCheckedChange={(v) => setForm({ ...form, showRemarque: !!v, description: v ? form.description : "" })} />
@@ -882,6 +968,26 @@ export default function Formations() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label className="mb-2 block">Coût formateur (€)</Label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={editCoutFormateur || ""}
+                onChange={(e) => setEditCoutFormateur(parseFloat(e.target.value) || 0)}
+              />
+              {editCoutFormateur > 0 && editFormateurFormation?.prix_ht > 0 && (
+                <p className="text-xs mt-1 text-muted-foreground">
+                  Marge : <span className={editFormateurFormation.prix_ht - editCoutFormateur >= 0 ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
+                    {(editFormateurFormation.prix_ht - editCoutFormateur).toLocaleString("fr-FR")} €
+                  </span>
+                  <span className="ml-1 text-muted-foreground">
+                    (CA {editFormateurFormation.prix_ht.toLocaleString("fr-FR")} €)
+                  </span>
+                </p>
+              )}
             </div>
             <Button className="w-full gradient-primary text-primary-foreground" onClick={saveEditFormateur}>Enregistrer</Button>
           </div>
