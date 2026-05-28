@@ -1108,7 +1108,7 @@ export function StatistiquesStagiaire({ stagiaireId }: { stagiaireId: string }) 
       {/* Filtre période */}
       <div className="flex gap-2">
         {([["semaine", "7 jours"], ["mois", "30 jours"], ["tout", "Tout"]] as const).map(([id, label]) => (
-          <button key={id} onClick={() => { setPeriode(id); setRapport(null); }}
+          <button key={id} onClick={() => setPeriode(id)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${periode === id ? "bg-primary/20 text-primary" : "bg-muted/30 text-muted-foreground hover:bg-muted/50"}`}>
             {label}
           </button>
