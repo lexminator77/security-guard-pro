@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { Shield, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,17 @@ const loginSchema = z.object({
 export default function Auth() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const rawNext = params.get("next") ?? "";
+  // Only same-origin relative paths are accepted.
+  const next = /^\/(?!\/)/.test(rawNext) ? rawNext : "/";
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
 
   useEffect(() => { document.title = "Connexion — SecureCRM"; }, []);
 
-  if (!loading && user) return <Navigate to="/" replace />;
+  if (!loading && user) return <Navigate to={next} replace />;
 
   const handle = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +37,7 @@ export default function Auth() {
       if (forgot) {
         const email = z.string().email().parse(form.email);
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${window.location.origin}/reset-password?next=${encodeURIComponent(next)}`,
         });
         if (error) throw error;
         toast.success("Email envoyé. Vérifie ta boîte de réception.");
@@ -46,7 +50,7 @@ export default function Auth() {
         });
         if (error) throw error;
         toast.success("Connexion réussie");
-        nav("/");
+        nav(next);
       }
     } catch (err: any) {
       toast.error(err.errors?.[0]?.message || err.message || "Erreur");
