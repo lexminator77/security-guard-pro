@@ -35,6 +35,7 @@ import FinancementOpco from "./pages/FinancementOpco";
 import PasseportPrevention from "./pages/PasseportPrevention";
 import VerificationCNAPS from "./pages/VerificationCNAPS";
 import Aujourd_hui from "./pages/Aujourd_hui";
+import OAuthConsent from "./pages/OAuthConsent";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Aujourd_hui />} />
               <Route path="/aujourd-hui" element={<Aujourd_hui />} />
