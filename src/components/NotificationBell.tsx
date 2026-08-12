@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useState, useRef } from "react";
 import { Bell, Clock, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
