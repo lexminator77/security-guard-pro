@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.2",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://hvqbggkfqssvbmracscm.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "security-guard-pro",
+      "version": "0.1.0",
+      "title": "Security Guard Pro"
+    },
+    "tools": [
+      {
+        "name": "list_formations",
+        "title": "Lister les sessions de formation",
+        "description": "Liste les sessions de formation (titre, type, dates, lieu, statut). Filtre optionnel par statut ou par sessions à venir uniquement.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Filtrer par statut, ex: planifiee, en_cours, terminee"
+            },
+            "upcoming_only": {
+              "type": "boolean",
+              "description": "Ne garder que les sessions dont la date de début est future"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Nombre maximum de sessions (défaut 25, max 100)"
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "search_stagiaires",
+        "title": "Rechercher des stagiaires",
+        "description": "Recherche des stagiaires par nom ou prénom et renvoie leurs coordonnées, statut, numéro de carte pro et dates d'expiration.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Texte recherché dans le nom ou le prénom"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Nombre maximum de résultats (défaut 25, max 100)"
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_formation_participants",
+        "title": "Lister les participants d'une session",
+        "description": "Liste les stagiaires inscrits à une session de formation donnée, avec leur statut (inscrit, present, absent, valide, echec).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "formation_id": {
+              "type": "string",
+              "description": "Identifiant de la session de formation"
+            }
+          },
+          "required": [
+            "formation_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_expiring_certifications",
+        "title": "Échéances de cartes pro et MAC APS",
+        "description": "Liste les stagiaires dont la carte professionnelle ou le MAC APS expire dans les prochains mois (ou est déjà expiré), pour planifier les recyclages.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "months_ahead": {
+              "type": "integer",
+              "description": "Horizon en mois (défaut 6)"
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_incident",
+        "title": "Créer un incident (main courante)",
+        "description": "Enregistre un nouvel incident dans la main courante au nom de l'utilisateur connecté.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Titre court de l'incident"
+            },
+            "description": {
+              "type": "string",
+              "description": "Description détaillée"
+            },
+            "location": {
+              "type": "string",
+              "description": "Lieu de l'incident"
+            },
+            "severity": {
+              "type": "string",
+              "description": "Sévérité, ex: faible, moyenne, elevee, critique"
+            },
+            "occurred_at": {
+              "type": "string",
+              "description": "Date/heure ISO de survenue (défaut: maintenant)"
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
