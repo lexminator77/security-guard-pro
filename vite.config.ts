@@ -19,7 +19,6 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      workbox: { maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 },
       includeAssets: ["favicon.ico", "apple-touch-icon.png"],
       manifest: {
         name: "SecureCRM",
@@ -51,6 +50,7 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
